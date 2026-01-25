@@ -51,36 +51,38 @@ async def deferred_worker_start():
     await asyncio.sleep(5)
     await run_background_worker()
 
-async def run_background_worker():
+async def run_background_worker(force_clean: bool = False):
     global worker_status
     if worker_status["is_running"]:
         return
     
     worker_status["is_running"] = True
     try:
-        # PROTECCIÓN NUBE: Si ya hay datos, no borramos al arrancar (para evitar el 502 por carga pesada)
-        # Solo borramos si el usuario lo pide explícitamente vía API o si está en desarrollo local.
-        is_prod = os.getenv("RENDER") is not None
-        count = scanner.db.count_stocks()
-        
-        if is_prod and count > 0:
-            print(f"[SISTEMA] Modo Producción: Saltando limpieza inicial. {count} activos cargados.")
-        else:
-            print("\n[SISTEMA] Iniciando limpieza y actualización total...")
+        # Lógica inteligente de limpieza
+        if force_clean:
+            print("[SISTEMA] Limpieza forzada solicitada por el usuario.")
             scanner.db.clear_all()
+        else:
+            is_prod = os.getenv("RENDER") is not None
+            count = scanner.db.count_stocks()
+            if is_prod and count > 0:
+                print(f"[SISTEMA] Modo Producción: Manteniendo {count} activos precargados para rapidez.")
+            else:
+                print("\n[SISTEMA] Iniciando limpieza y actualización total...")
+                scanner.db.clear_all()
         
-        # Descarga rápida de la lista de tickers
+        # Descarga de la lista de tickers
         tickers = TickerSource.get_all_tickers()
         worker_status["tickers_found"] = len(tickers)
         
         full_list = list(set(tickers + WATCHLIST))
-        print(f"[SISTEMA] Escaneando {len(full_list)} activos en segundo plano (No bloqueante)...")
+        print(f"[SISTEMA] Escaneando {len(full_list)} activos en segundo plano...")
         
-        # IMPORTANTE: Ejecutamos en un hilo separado para que FastAPI pueda responder (Evita el 502)
+        # Ejecución en hilo separado para no bloquear la API
         await asyncio.to_thread(scanner.run_full_scan_to_db, full_list)
         
         worker_status["last_run"] = time.ctime()
-        print(f"[SISTEMA] Tarea de fondo completada.")
+        print(f"[SISTEMA] Actualización completa terminada.")
     except Exception as e:
         print(f"[SISTEMA] Error en proceso de fondo: {e}")
     finally:
@@ -91,7 +93,7 @@ def get_status():
     count = scanner.db.count_stocks()
     return {
         "metodo": "GET",
-        "version": "2.5 (Massive Engine)", 
+        "version": "2.8 (Cloud Optimized)", 
         "estado_base_datos": f"{count} activos indexados",
         "trabajador": worker_status,
         "puntos_de_entrada": ["/api/scan", "/api/analyze/{symbol}", "/api/update-db"]
@@ -106,8 +108,9 @@ def get_top_stocks(limit: int = 10, min_score: int = 0):
 def force_update(background_tasks: BackgroundTasks):
     if worker_status["is_running"]:
         return {"mensaje": "Ya hay un escaneo en progreso."}
-    background_tasks.add_task(run_background_worker)
-    return {"mensaje": "Actualización en segundo plano iniciada."}
+    # Forzamos la limpieza cuando se pide manualmente
+    background_tasks.add_task(run_background_worker, force_clean=True)
+    return {"mensaje": "Actualización MANUAL con limpieza iniciada en segundo plano."}
 
 @app.get("/api/analyze/{symbol}")
 def analyze_one(symbol: str):
