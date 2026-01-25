@@ -58,23 +58,29 @@ async def run_background_worker():
     
     worker_status["is_running"] = True
     try:
-        print("\n[SISTEMA] Iniciando actualización de base de datos...")
-        # Limpiamos la base de datos para asegurar un inicio desde cero (Snapshot diario limpio)
-        scanner.db.clear_all()
+        # PROTECCIÓN NUBE: Si ya hay datos, no borramos al arrancar (para evitar el 502 por carga pesada)
+        # Solo borramos si el usuario lo pide explícitamente vía API o si está en desarrollo local.
+        is_prod = os.getenv("RENDER") is not None
+        count = scanner.db.count_stocks()
         
-        # Descarga rápida de la lista de tickers (solo texto, muy ligero)
+        if is_prod and count > 0:
+            print(f"[SISTEMA] Modo Producción: Saltando limpieza inicial. {count} activos cargados.")
+        else:
+            print("\n[SISTEMA] Iniciando limpieza y actualización total...")
+            scanner.db.clear_all()
+        
+        # Descarga rápida de la lista de tickers
         tickers = TickerSource.get_all_tickers()
         worker_status["tickers_found"] = len(tickers)
         
         full_list = list(set(tickers + WATCHLIST))
-        print(f"[SISTEMA] Escaneando {len(full_list)} activos de forma asíncrona...")
+        print(f"[SISTEMA] Escaneando {len(full_list)} activos en segundo plano (No bloqueante)...")
         
-        # Ejecutamos el escaneo sin bloquear el hilo principal
-        # El Scanner usa hilos internamente para las peticiones a Yahoo Finance
-        scanner.run_full_scan_to_db(full_list)
+        # IMPORTANTE: Ejecutamos en un hilo separado para que FastAPI pueda responder (Evita el 502)
+        await asyncio.to_thread(scanner.run_full_scan_to_db, full_list)
         
         worker_status["last_run"] = time.ctime()
-        print(f"[SISTEMA] Tarea completada. Base de datos actualizada.")
+        print(f"[SISTEMA] Tarea de fondo completada.")
     except Exception as e:
         print(f"[SISTEMA] Error en proceso de fondo: {e}")
     finally:
