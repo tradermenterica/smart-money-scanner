@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+.venv
+env/
+venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+
+# Database (Opcional)
+# Si quieres subir la base de datos ya llena a GitHub, comenta la siguiente línea:
+# scanner.db
+
+# Logs
+*.log
+debug_output.txt

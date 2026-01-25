@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: smart-money-scanner-api
+    runtime: docker
+    plan: free
+    region: ohio
+    envVars:
+      - key: PORT
+        value: 8000
+    autoDeploy: true

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Money Scanner | Terminal Institucional</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="dark-theme">
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="logo">
+                <i data-lucide="activity" class="logo-icon"></i>
+                <span class="logo-text">Smart<span>Money</span></span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active"><i data-lucide="layout-dashboard"></i> Dashboard</a>
+                <a href="#" class="nav-item"><i data-lucide="layers"></i> Portfolio</a>
+                <a href="#" class="nav-item"><i data-lucide="database"></i> Database</a>
+                <a href="#" class="nav-item"><i data-lucide="settings"></i> Config</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-indicator">
+                    <span class="pulse"></span>
+                    <span id="scannerStatus">Scanner Live</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="search-bar">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="tickerSearch" placeholder="Buscar símbolo (ej: AAPL)...">
+                </div>
+                <div class="header-actions">
+                    <button class="btn btn-secondary" id="updateDbBtn">
+                        <i data-lucide="refresh-cw"></i> Actualizar DB
+                    </button>
+                    <div class="user-profile">
+                        <div class="avatar">JR</div>
+                    </div>
+                </div>
+            </header>
+
+            <section class="dashboard-overview">
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Total Indexado</span>
+                            <i data-lucide="database" class="stat-icon"></i>
+                        </div>
+                        <div class="stat-value" id="totalIndexed">0</div>
+                        <div class="stat-footer">
+                            <span class="trend up"><i data-lucide="trending-up"></i> +2.4%</span>
+                            <span class="time">vs ayer</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Oportunidades</span>
+                            <i data-lucide="zap" class="stat-icon warning"></i>
+                        </div>
+                        <div class="stat-value" id="opportunityCount">0</div>
+                        <div class="stat-footer">
+                            <span class="trend up"><i data-lucide="target"></i> Score > 75</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-header">
+                            <span class="stat-label">Scanner Status</span>
+                            <i data-lucide="cpu" class="stat-icon primary"></i>
+                        </div>
+                        <div class="stat-value" id="workerState">IDLE</div>
+                        <div class="stat-footer">
+                            <span id="scanProgressText">A la espera</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="results-container">
+                    <div class="section-header">
+                        <h2>Institucionales Identificados</h2>
+                        <div class="filters">
+                            <select id="scoreFilter">
+                                <option value="0">Todos los Scores</option>
+                                <option value="50">+50 points</option>
+                                <option value="75">+75 points (Top)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="stocks-grid" id="stocksGrid">
+                        <!-- Stock cards will be injected here -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal for Stock Details -->
+    <div id="stockModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modalBody"></div>
+        </div>
+    </div>
+
+    <script src="/static/app.js"></script>
+    <script>
+      lucide.createIcons();
+    </script>
+</body>
+</html>
