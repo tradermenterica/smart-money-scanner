@@ -25,7 +25,15 @@ async function fetchHome() {
 
 async function fetchStocks(minScore = 0) {
     try {
-        const response = await fetch(`${API_BASE}/scan?limit=50&min_score=${minScore}`);
+        let url = `${API_BASE}/scan?limit=50&min_score=${minScore}`;
+
+        if (minScore === "darwinex") {
+            url = `${API_BASE}/scan-darwinex?limit=50&min_score=0`;
+        } else {
+            url = `${API_BASE}/scan?limit=50&min_score=${minScore}`;
+        }
+
+        const response = await fetch(url);
         const data = await response.json();
 
         const grid = document.getElementById('stocksGrid');

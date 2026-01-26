@@ -73,9 +73,10 @@ async def run_background_worker(force_clean: bool = False):
         
         # Descarga de la lista de tickers
         tickers = TickerSource.get_all_tickers()
+        darwinex_tickers = TickerSource.get_darwinex_tickers()
         worker_status["tickers_found"] = len(tickers)
         
-        full_list = list(set(tickers + WATCHLIST))
+        full_list = list(set(tickers + WATCHLIST + darwinex_tickers))
         print(f"[SISTEMA] Escaneando {len(full_list)} activos en segundo plano...")
         
         # Ejecución en hilo separado para no bloquear la API
@@ -102,6 +103,12 @@ def get_status():
 @app.get("/api/scan")
 def get_top_stocks(limit: int = 10, min_score: int = 0):
     results = scanner.get_results_from_db(min_score=min_score, limit=limit)
+    return {"conteo": len(results), "resultados": results}
+
+@app.get("/api/scan-darwinex")
+def get_darwinex_stocks(limit: int = 10, min_score: int = 0):
+    darwinex_list = TickerSource.get_darwinex_tickers()
+    results = scanner.db.get_stocks_by_list(darwinex_list, min_score=min_score, limit=limit)
     return {"conteo": len(results), "resultados": results}
 
 @app.post("/api/update-db")

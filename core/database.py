@@ -90,6 +90,42 @@ class DatabaseManager:
         conn.close()
         return results
 
+    def get_stocks_by_list(self, symbols: list, limit=10, min_score=0):
+        """Retrieves stocks from DB that are in the provided list."""
+        if not symbols:
+            return []
+            
+        conn = self.get_connection()
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        placeholders = ', '.join(['?'] * len(symbols))
+        query = f'''
+            SELECT * FROM stocks 
+            WHERE symbol IN ({placeholders}) AND score >= ? 
+            ORDER BY score DESC 
+            LIMIT ?
+        '''
+        
+        params = symbols + [min_score, limit]
+        cursor.execute(query, params)
+        
+        rows = cursor.fetchall()
+        
+        results = []
+        for row in rows:
+            results.append({
+                "symbol": row['symbol'],
+                "score": row['score'],
+                "price": row['price'],
+                "passed_financials": bool(row['passed_financials']),
+                "details": json.loads(row['details']),
+                "signals": json.loads(row['signals'])
+            })
+            
+        conn.close()
+        return results
+
     def clear_all(self):
         """Borra todos los registros de la tabla de acciones."""
         conn = self.get_connection()

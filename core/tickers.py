@@ -4,10 +4,76 @@ import requests
 
 class TickerSource:
     @staticmethod
-    def get_all_tickers():
+    def get_darwinex_tickers():
         """
-        Fetches tickers from NASDAQ, NYSE, AMEX, and ARCA (approx 8000+ total).
+        Returns the list of tickers available in Darwinex as provided by the user.
         """
+        raw_list = """
+        AAL,CMCSA,GLW,LRCX
+        AAPL,CME,GM,LUV
+        ABBV,CMI,GOOG,LVS
+        ABT,CNC,GOOGL,LYB
+        ACN,COF,GS,MA
+        ADBE,COP,GWW,MAR
+        ADI,COST,HAL,MCD
+        ADM,CRM,HCA,MCHP
+        ADP,CSCO,HD,MCK
+        ADSK,CSX,HLT,MDLZ
+        AEP,CTSH,HON,MDT
+        AIG,CVS,HPE,MET
+        ALL,CVX,HPQ,META
+        AMAT,D,HUM,MMM
+        AMD,DAL,IBM,MO
+        AMGN,DD,ICE,MPC
+        AMT,DE,ILMN,MRK
+        AMZN,DG,INTC,MS
+        APD,DHI,INTU,MSFT
+        AVGO,DHR,ISRG,MU
+        AXP,DIS,ITW,NEE
+        BA,DLTR,JCI,NEM
+        BAC,DOW,JNJ,NFLX
+        BAX,DUK,JPM,NKE
+        BBY,EA,KDP,NOC
+        BDX,EBAY,KEY,NSC
+        BIIB,EL,KHC,NTAP
+        BK,ELV,KLAC,NVDA
+        BKNG,EMR,KMB,OKE
+        BLK,EOG,KMI,OMC
+        BMY,ETN,KO,ORCL
+        BRKb,EW,KR,ORLY
+        BSX,EXC,LEN,OXY
+        C,EXPE,LLY,PANW
+        CAH,FAST,LMT,PEP
+        CAT,FDX,LOW,PFE
+        CB,FIS,PG,PGR
+        CCI,FITB,PH,PLD
+        CCL,FOX,PM,PNC
+        CHTR,FOXA,PPG,PRU
+        CI,FTV,PSA,PYPL
+        CLX,GD,QCOM,RCL
+        CL,GE,REGN,RF
+        CMA,GILD,ROK,ROST
+        SBUX,SCHW,SHW,SLB
+        SO,SPG,SPGI,SRE
+        STT,STZ,SWK,SWKS
+        SYF,SYK,SYY,T
+        TGT,TJX,TMO,TMUS
+        TRV,TSLA,TSN,TTWO
+        TXN,UAL,ULTA,UNH
+        UNP,UPS,USB,V
+        VFC,VLO,VRTX,VZ
+        WDAY,WDC,WFC,WM
+        WMB,WMT,XOM,ZTS
+        FISV,MRSH
+        """
+        # Clean and split the list
+        tickers = []
+        for line in raw_list.strip().split('\n'):
+            parts = [t.strip().upper() for t in line.split(',') if t.strip()]
+            tickers.extend(parts)
+        
+        return sorted(list(set(tickers)))
+
     @staticmethod
     def get_all_tickers():
         """
