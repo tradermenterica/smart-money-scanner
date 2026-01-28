@@ -106,19 +106,35 @@ class Scanner:
                 inst.analyze_flows()
                 inst_res = inst.detect_smart_money()
 
-                # Scoring
+                # NEW Scoring Logic: "Short-Term Explosive"
                 score = 0
-                if fund_res["passed"]: score += 30
-                if tech_res["trend"] == "Uptrend": score += 20
-                if tech_res["rvol"] > 1.5: score += 15
-                if inst_res["detected"]: score += 25
-                if tech_res["squeeze"]: score += 10
+                
+                # A. Technical Core (High Priority)
+                if tech_res["trend"] == "Uptrend": score += 15
+                if tech_res["squeeze"]: score += 30  # Squeeze is critical for explosion
+                if tech_res["vcp"]: score += 15      # Contraction is a bonus
+                if tech_res["breakout"]: score += 20  # If already breaking, it's good
+                
+                # B. Money Flow & Volume
+                if tech_res["rvol"] > 2.0: 
+                    score += 20
+                elif tech_res["rvol"] > 1.2:
+                    score += 10
+                    
+                if inst_res["detected"]: score += 20
+                
+                # C. Fundamentals (Reduced priority for short-term)
+                if fund_res["passed"]: score += 15
+                
+                # Bonus: RVOL during Squeeze/VCP is very powerful
+                if (tech_res["squeeze"] or tech_res["vcp"]) and tech_res["rvol"] > 1.5:
+                    score += 10
 
                 if score > 0:
                     result = {
                         "symbol": symbol,
                         "passed_financials": fund_res["passed"],
-                        "score": score,
+                        "score": min(score, 100), # Cap at 100
                         "details": {
                             "fundamentals": fund_res,
                             "technicals": tech_res,

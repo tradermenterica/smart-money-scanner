@@ -46,13 +46,24 @@ class TechnicalAnalyzer:
         if pd.notnull(last['SMA_50']):
             bullish_trend = last['Close'] > last['SMA_50']
         
-        # 2. Consolidation / Squeeze
+        # 2. Consolidation / Squeeze (Tightening)
         is_squeezing = False
+        bandwidth = 0
         if pd.notnull(last['BB_WIDTH']):
-            recent_widths = self.df['BB_WIDTH'].tail(50)
-            is_squeezing = last['BB_WIDTH'] < recent_widths.quantile(0.20)
+            bandwidth = last['BB_WIDTH']
+            # Squeeze is true if bandwidth is in the bottom 25% of the last 100 days
+            recent_widths = self.df['BB_WIDTH'].tail(100)
+            is_squeezing = bandwidth < recent_widths.quantile(0.25)
 
-        # 3. Momentum / Explosion
+        # 3. Volatility Contraction Pattern (VCP) Lite
+        # We look for the High-Low range to be shrinking over the last 3-4 days
+        ranges = (self.df['High'] - self.df['Low']).tail(4)
+        vcp = False
+        if len(ranges) >= 4:
+            # Check if current range is smaller than 3 days ago
+            vcp = ranges.iloc[-1] < ranges.iloc[-3] and ranges.iloc[-2] < ranges.iloc[-3]
+
+        # 4. Momentum / Explosion
         breakout = False
         if pd.notnull(last['BBU_20_2.0']):
              breakout = last['Close'] > last['BBU_20_2.0']
@@ -60,7 +71,9 @@ class TechnicalAnalyzer:
         return {
             "trend": "Uptrend" if bullish_trend else "Downtrend",
             "squeeze": bool(is_squeezing),
+            "vcp": bool(vcp),
             "breakout": bool(breakout),
+            "bandwidth": float(bandwidth),
             "rvol": float(last['RVOL']) if pd.notnull(last['RVOL']) else 0.0,
             "last_close": float(last['Close'])
         }
