@@ -10,7 +10,7 @@ import asyncio
 import time
 import os
 
-app = FastAPI(title="Smart Money Scanner API", version="2.9")
+app = FastAPI(title="Smart Money Scanner API", version="2.9.1")
 
 app.add_middleware(
     CORSMiddleware,
