@@ -4,11 +4,8 @@
 # This can be expanded to include all S&P 500 or other indices.
 # For MVP, we start with a mix of solid companies and some potentially volatile ones to test.
 
-WATCHLIST = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "AMD", "META",
-    "NFLX", "INTC", "CSCO", "PEP", "KO", "JPM", "BAC",
-    "PLTR", "SOFI", "AMD", "F", "GM", "XOM", "CVX", "NIO", "BABA"
-]
+WATCHLIST = ["AAPL", "TSLA", "NVDA", "BTC-USD"]
+DARWINEX_ONLY = True  # Si es True, solo escanea activos de Darwinex para velocidad extrema
 
 # Criteria Thresholds
 THRESHOLDS = {

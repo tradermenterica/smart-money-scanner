@@ -4,13 +4,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from core.scanner import Scanner
 from core.tickers import TickerSource
-from config import WATCHLIST
+from config import WATCHLIST, DARWINEX_ONLY
 from pydantic import BaseModel
 import asyncio
 import time
 import os
 
-app = FastAPI(title="Smart Money Scanner API", version="2.7")
+app = FastAPI(title="Smart Money Scanner API", version="2.9")
 
 app.add_middleware(
     CORSMiddleware,
@@ -72,12 +72,17 @@ async def run_background_worker(force_clean: bool = False):
                 scanner.db.clear_all()
         
         # Descarga de la lista de tickers
-        tickers = TickerSource.get_all_tickers()
+        if DARWINEX_ONLY:
+            print("[SISTEMA] Modo DARWINEX_ONLY activo. Saltando búsqueda masiva.")
+            tickers = []
+        else:
+            tickers = TickerSource.get_all_tickers()
+            
         darwinex_tickers = TickerSource.get_darwinex_tickers()
-        worker_status["tickers_found"] = len(tickers)
+        worker_status["tickers_found"] = len(tickers) if not DARWINEX_ONLY else len(darwinex_tickers)
         
         full_list = list(set(tickers + WATCHLIST + darwinex_tickers))
-        print(f"[SISTEMA] Escaneando {len(full_list)} activos en segundo plano...")
+        print(f"[SISTEMA] Escaneando {len(full_list)} activos en segundo plano (Modo: {'Darwinex' if DARWINEX_ONLY else 'Total'})...")
         
         # Ejecución en hilo separado para no bloquear la API
         await asyncio.to_thread(scanner.run_full_scan_to_db, full_list)
