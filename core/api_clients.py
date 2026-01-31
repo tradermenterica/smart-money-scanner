@@ -366,3 +366,224 @@ class AlphaVantageClient:
             "52_week_low": float(data.get('52WeekLow', 0))
         }
 
+
+class SECApiClient:
+    """
+    Client for sec-api.io to access SEC filings data.
+    Provides access to Form 13F (institutional holdings) and Form 4 (insider trading).
+    """
+    
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or os.getenv("SEC_API_KEY", "")
+        self.base_url = "https://api.sec-api.io"
+        self.last_call_time = 0
+        self.min_interval = 1.0  # 1 second between calls (conservative)
+    
+    def _rate_limit(self):
+        """Ensures we don't exceed rate limits"""
+        elapsed = time.time() - self.last_call_time
+        if elapsed < self.min_interval:
+            time.sleep(self.min_interval - elapsed)
+        self.last_call_time = time.time()
+    
+    def _make_request(self, endpoint: str, params: Dict = None) -> Optional[Dict]:
+        """Makes a rate-limited request to SEC API"""
+        if not self.api_key:
+            print("[SEC_API] API key not configured")
+            return None
+        
+        self._rate_limit()
+        
+        try:
+            url = f"{self.base_url}/{endpoint}"
+            headers = {"Authorization": self.api_key}
+            
+            response = requests.get(url, headers=headers, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                return response.json()
+            elif response.status_code == 429:
+                print(f"[SEC_API] Rate limit exceeded")
+                return None
+            else:
+                print(f"[SEC_API] Error {response.status_code}: {response.text}")
+                return None
+                
+        except Exception as e:
+            print(f"[SEC_API] Request failed: {e}")
+            return None
+    
+    def test_connection(self) -> bool:
+        """Tests if API key is valid"""
+        # Try a simple mapping query
+        result = self._make_request("mapping/ticker/AAPL")
+        return result is not None
+    
+    def get_13f_holdings(self, ticker: str, limit: int = 5) -> Optional[Dict]:
+        """
+        Gets Form 13F institutional holdings for a ticker.
+        Returns recent institutional buying/selling activity.
+        """
+        try:
+            # Query for recent 13F filings mentioning this ticker
+            query = {
+                "query": {
+                    "query_string": {
+                        "query": f"ticker:{ticker} AND formType:\"13F-HR\""
+                    }
+                },
+                "from": "0",
+                "size": str(limit),
+                "sort": [{"filedAt": {"order": "desc"}}]
+            }
+            
+            # Use the query API endpoint
+            response = requests.post(
+                f"{self.base_url}/query",
+                headers={"Authorization": self.api_key},
+                json=query,
+                timeout=15
+            )
+            
+            if response.status_code != 200:
+                return None
+            
+            data = response.json()
+            filings = data.get('filings', [])
+            
+            if not filings:
+                return None
+            
+            # Analyze holdings changes
+            institutions_buying = []
+            institutions_selling = []
+            total_change_shares = 0
+            
+            for filing in filings[:limit]:
+                filer_name = filing.get('companyName', 'Unknown')
+                filed_at = filing.get('filedAt', '')
+                
+                # Note: Full holdings data requires additional API call
+                # For now, we track which institutions filed recently
+                institutions_buying.append({
+                    "name": filer_name,
+                    "filed_date": filed_at
+                })
+            
+            return {
+                "ticker": ticker,
+                "recent_13f_filings": len(filings),
+                "institutions_filing": institutions_buying[:5],
+                "data_source": "sec-api.io",
+                "note": "Recent 13F filings indicate institutional interest"
+            }
+            
+        except Exception as e:
+            print(f"[SEC_API] Error fetching 13F for {ticker}: {e}")
+            return None
+    
+    def get_insider_trading(self, ticker: str, days: int = 90) -> Optional[Dict]:
+        """
+        Gets Form 4 insider trading activity for a ticker.
+        Returns recent insider buys and sells.
+        """
+        try:
+            from datetime import datetime, timedelta
+            
+            # Calculate date range
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=days)
+            
+            # Query for Form 4 filings
+            query = {
+                "query": {
+                    "query_string": {
+                        "query": f"ticker:{ticker} AND formType:\"4\""
+                    }
+                },
+                "from": "0",
+                "size": "50",
+                "sort": [{"filedAt": {"order": "desc"}}]
+            }
+            
+            response = requests.post(
+                f"{self.base_url}/query",
+                headers={"Authorization": self.api_key},
+                json=query,
+                timeout=15
+            )
+            
+            if response.status_code != 200:
+                return None
+            
+            data = response.json()
+            filings = data.get('filings', [])
+            
+            if not filings:
+                return None
+            
+            # Analyze insider transactions
+            buy_transactions = []
+            sell_transactions = []
+            
+            for filing in filings:
+                filed_at = filing.get('filedAt', '')
+                
+                # Filter by date range
+                try:
+                    filing_date = datetime.fromisoformat(filed_at.replace('Z', '+00:00'))
+                    if filing_date < start_date:
+                        continue
+                except:
+                    continue
+                
+                insider_name = filing.get('companyName', 'Unknown')
+                
+                # Check transaction type (this is simplified - full parsing requires more work)
+                # For now, we count filings as potential transactions
+                description = filing.get('description', '').lower()
+                
+                if 'purchase' in description or 'acquisition' in description:
+                    buy_transactions.append({
+                        "insider": insider_name,
+                        "date": filed_at,
+                        "type": "BUY"
+                    })
+                elif 'sale' in description or 'disposition' in description:
+                    sell_transactions.append({
+                        "insider": insider_name,
+                        "date": filed_at,
+                        "type": "SELL"
+                    })
+            
+            return {
+                "ticker": ticker,
+                "period_days": days,
+                "buy_transactions": len(buy_transactions),
+                "sell_transactions": len(sell_transactions),
+                "net_insider_sentiment": "BUYING" if len(buy_transactions) > len(sell_transactions) else "SELLING" if len(sell_transactions) > len(buy_transactions) else "NEUTRAL",
+                "recent_buys": buy_transactions[:5],
+                "recent_sells": sell_transactions[:5],
+                "data_source": "sec-api.io (Form 4)"
+            }
+            
+        except Exception as e:
+            print(f"[SEC_API] Error fetching Form 4 for {ticker}: {e}")
+            return None
+    
+    def get_ticker_info(self, ticker: str) -> Optional[Dict]:
+        """
+        Maps ticker to CIK and company info.
+        """
+        data = self._make_request(f"mapping/ticker/{ticker}")
+        if not data:
+            return None
+        
+        return {
+            "ticker": data.get('ticker', ''),
+            "name": data.get('name', ''),
+            "cik": data.get('cik', ''),
+            "exchange": data.get('exchange', '')
+        }
+
+

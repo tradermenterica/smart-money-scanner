@@ -14,8 +14,9 @@ class DipDetector:
     
     def __init__(self):
         self.finnhub = FinnhubClient()
-        from core.api_clients import AlphaVantageClient
+        from core.api_clients import AlphaVantageClient, SECApiClient
         self.alpha_vantage = AlphaVantageClient()
+        self.sec_api = SECApiClient()
     
     def calculate_drawdown(self, df: pd.DataFrame, period: int = 20) -> Dict:
         """
@@ -100,43 +101,75 @@ class DipDetector:
     
     def score_institutional_data(self, symbol: str, current_price: float) -> Dict:
         """
-        Fetches and scores institutional data from Finnhub.
-        Returns institutional score (0-40 points) and details.
+        Fetches and scores institutional data.
+        Uses SEC API (primary) with Finnhub fallback.
+        Returns institutional score (0-50 points) and details.
         """
         score = 0
         details = {}
         
-        # 1. Institutional Ownership (0-10 pts)
-        inst_ownership = self.finnhub.get_institutional_ownership(symbol)
-        if inst_ownership:
-            ownership_pct = inst_ownership.get('change_percentage', 0)
+        # Try SEC API first for real 13F data
+        sec_13f = self.sec_api.get_13f_holdings(symbol, limit=10)
+        if sec_13f and sec_13f.get('recent_13f_filings', 0) > 0:
+            # Recent 13F filings indicate institutional interest
+            num_filings = sec_13f.get('recent_13f_filings', 0)
             
-            # High institutional ownership is good
-            if ownership_pct > 60:
+            if num_filings >= 5:
+                score += 15  # High institutional interest
+            elif num_filings >= 2:
                 score += 10
-            elif ownership_pct > 40:
+            
+            details['13f_filings'] = sec_13f
+            details['institutional_source'] = 'SEC API (13F)'
+        else:
+            # Fallback to Finnhub institutional ownership
+            inst_ownership = self.finnhub.get_institutional_ownership(symbol)
+            if inst_ownership:
+                ownership_pct = inst_ownership.get('change_percentage', 0)
+                
+                if ownership_pct > 60:
+                    score += 10
+                elif ownership_pct > 40:
+                    score += 5
+                
+                if inst_ownership.get('total_change', 0) > 0:
+                    score += 15
+                
+                details['institutional_ownership'] = inst_ownership
+                details['institutional_source'] = 'Finnhub'
+        
+        # Try SEC API for insider trading (Form 4)
+        sec_insider = self.sec_api.get_insider_trading(symbol, days=60)
+        if sec_insider:
+            net_sentiment = sec_insider.get('net_insider_sentiment', 'NEUTRAL')
+            buy_count = sec_insider.get('buy_transactions', 0)
+            sell_count = sec_insider.get('sell_transactions', 0)
+            
+            if net_sentiment == 'BUYING':
+                score += 20  # Strong insider buying signal
+            elif net_sentiment == 'NEUTRAL' and buy_count > 0:
+                score += 10
+            
+            # Bonus for no insider selling
+            if sell_count == 0 and buy_count > 0:
                 score += 5
             
-            # Institutional buying (positive change) is very good
-            if inst_ownership.get('total_change', 0) > 0:
-                score += 15
-            
-            details['institutional_ownership'] = inst_ownership
+            details['insider_trading'] = sec_insider
+            details['insider_source'] = 'SEC API (Form 4)'
+        else:
+            # Fallback to Finnhub insider transactions
+            insider_data = self.finnhub.get_insider_transactions(symbol, days=30)
+            if insider_data:
+                if insider_data.get('insider_buying', False):
+                    score += 15
+                
+                if insider_data.get('sell_transactions', 0) == 0 and insider_data.get('buy_transactions', 0) > 0:
+                    score += 5
+                
+                details['insider_transactions'] = insider_data
+                details['insider_source'] = 'Finnhub'
         
-        # 2. Insider Transactions (0-15 pts)
-        insider_data = self.finnhub.get_insider_transactions(symbol, days=30)
-        if insider_data:
-            # Insider buying is a strong signal
-            if insider_data.get('insider_buying', False):
-                score += 15
-            
-            # No insider selling is a bonus
-            if insider_data.get('sell_transactions', 0) == 0 and insider_data.get('buy_transactions', 0) > 0:
-                score += 5
-            
-            details['insider_transactions'] = insider_data
-        
-        # 3. Analyst Recommendations (0-10 pts)
+        # Analyst Recommendations (Finnhub)
         recommendations = self.finnhub.get_recommendation_trends(symbol)
         if recommendations:
             buy_pct = recommendations.get('buy_percentage', 0)
@@ -148,7 +181,7 @@ class DipDetector:
             
             details['recommendations'] = recommendations
         
-        # 4. Price Target (0-10 pts)
+        # Price Target (Finnhub)
         price_target = self.finnhub.get_price_target(symbol)
         if price_target and current_price > 0:
             target_mean = price_target.get('target_mean', 0)
@@ -163,7 +196,7 @@ class DipDetector:
             details['upside_potential'] = float(upside)
         
         return {
-            "institutional_score": min(score, 40),  # Cap at 40
+            "institutional_score": min(score, 50),  # Cap at 50 (increased from 40)
             "details": details
         }
     
