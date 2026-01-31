@@ -10,7 +10,7 @@ import asyncio
 import time
 import os
 
-app = FastAPI(title="Smart Money Scanner API", version="2.9.1")
+app = FastAPI(title="Smart Money Scanner API", version="2.9.2")
 
 app.add_middleware(
     CORSMiddleware,
@@ -40,7 +40,7 @@ worker_status = {
 @app.on_event("startup")
 async def startup_event():
     print("\n" + "="*40)
-    print("SMART MONEY API v2.7 (Smart Batch Engine)")
+    print("SMART MONEY API v2.9.2 (LuxAlgo Engine)")
     print("Servidor operativo e instantáneo.")
     print("="*40)
     # NO bloqueamos el inicio. El trabajador se lanzará después de que el servidor esté arriba.
@@ -99,7 +99,7 @@ def get_status():
     count = scanner.db.count_stocks()
     return {
         "metodo": "GET",
-        "version": "2.8 (Cloud Optimized)", 
+        "version": "2.9.2 (LuxAlgo Optimized)", 
         "estado_base_datos": f"{count} activos indexados",
         "trabajador": worker_status,
         "puntos_de_entrada": ["/api/scan", "/api/analyze/{symbol}", "/api/update-db"]

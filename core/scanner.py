@@ -122,13 +122,14 @@ class Scanner:
                     score += 10
                     
                 if inst_res["detected"]: score += 20
+                if inst_res["institutional_score"] >= 6: score += 15 # LuxAlgo High Conviction multiplier
                 
                 # C. Fundamentals (Reduced priority for short-term)
-                if fund_res["passed"]: score += 15
+                if fund_res["passed"]: score += 10
                 
-                # Bonus: RVOL during Squeeze/VCP is very powerful
-                if (tech_res["squeeze"] or tech_res["vcp"]) and tech_res["rvol"] > 1.5:
-                    score += 10
+                # Bonus: RVOL during Squeeze/VCP combined with Institutional buying is "The Perfect Trade"
+                if (tech_res["squeeze"] or tech_res["vcp"]) and inst_res["detected"]:
+                    score += 20
 
                 if score > 0:
                     result = {
