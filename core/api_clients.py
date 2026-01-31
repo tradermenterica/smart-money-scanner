@@ -189,3 +189,180 @@ class FinnhubClient:
             "shares_outstanding": data.get('shareOutstanding', 0),
             "industry": data.get('finnhubIndustry', 'N/A')
         }
+
+
+class AlphaVantageClient:
+    """
+    Client for Alpha Vantage API with rate limiting.
+    Free tier: 25 calls/day (very limited, use sparingly)
+    """
+    
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or os.getenv("ALPHA_VANTAGE_API_KEY", "")
+        self.base_url = "https://www.alphavantage.co/query"
+        self.last_call_time = 0
+        self.min_interval = 12.0  # 12 seconds between calls (safe for 25/day = ~5/hour)
+        self.daily_calls = 0
+        self.max_daily_calls = 25
+    
+    def _rate_limit(self):
+        """Ensures we don't exceed rate limits"""
+        elapsed = time.time() - self.last_call_time
+        if elapsed < self.min_interval:
+            time.sleep(self.min_interval - elapsed)
+        self.last_call_time = time.time()
+    
+    def _make_request(self, params: Dict) -> Optional[Dict]:
+        """Makes a rate-limited request to Alpha Vantage API"""
+        if not self.api_key:
+            print("[ALPHA_VANTAGE] API key not configured")
+            return None
+        
+        if self.daily_calls >= self.max_daily_calls:
+            print(f"[ALPHA_VANTAGE] Daily limit reached ({self.max_daily_calls} calls)")
+            return None
+        
+        self._rate_limit()
+        
+        try:
+            params['apikey'] = self.api_key
+            response = requests.get(self.base_url, params=params, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                # Check for API limit message
+                if 'Note' in data or 'Information' in data:
+                    print(f"[ALPHA_VANTAGE] Rate limit warning: {data}")
+                    return None
+                
+                self.daily_calls += 1
+                return data
+            else:
+                print(f"[ALPHA_VANTAGE] Error {response.status_code}: {response.text}")
+                return None
+                
+        except Exception as e:
+            print(f"[ALPHA_VANTAGE] Request failed: {e}")
+            return None
+    
+    def test_connection(self) -> bool:
+        """Tests if API key is valid"""
+        result = self._make_request({
+            "function": "GLOBAL_QUOTE",
+            "symbol": "AAPL"
+        })
+        return result is not None and 'Global Quote' in result
+    
+    def get_news_sentiment(self, symbol: str, limit: int = 50) -> Optional[Dict]:
+        """
+        Gets news sentiment for a ticker.
+        Returns aggregated sentiment score and article details.
+        """
+        params = {
+            "function": "NEWS_SENTIMENT",
+            "tickers": symbol,
+            "limit": limit
+        }
+        
+        data = self._make_request(params)
+        if not data or 'feed' not in data:
+            return None
+        
+        articles = data['feed']
+        if not articles:
+            return None
+        
+        # Calculate aggregated sentiment
+        total_sentiment = 0
+        positive_count = 0
+        negative_count = 0
+        neutral_count = 0
+        
+        for article in articles:
+            # Get ticker-specific sentiment
+            ticker_sentiments = article.get('ticker_sentiment', [])
+            for ts in ticker_sentiments:
+                if ts.get('ticker') == symbol:
+                    sentiment_score = float(ts.get('ticker_sentiment_score', 0))
+                    total_sentiment += sentiment_score
+                    
+                    if sentiment_score > 0.15:
+                        positive_count += 1
+                    elif sentiment_score < -0.15:
+                        negative_count += 1
+                    else:
+                        neutral_count += 1
+        
+        total_articles = len(articles)
+        avg_sentiment = total_sentiment / total_articles if total_articles > 0 else 0
+        
+        return {
+            "average_sentiment": float(avg_sentiment),
+            "total_articles": total_articles,
+            "positive_articles": positive_count,
+            "negative_articles": negative_count,
+            "neutral_articles": neutral_count,
+            "sentiment_label": self._get_sentiment_label(avg_sentiment),
+            "recent_headlines": [
+                {
+                    "title": a.get('title', ''),
+                    "source": a.get('source', ''),
+                    "time_published": a.get('time_published', ''),
+                    "sentiment": next((ts.get('ticker_sentiment_score', 0) 
+                                     for ts in a.get('ticker_sentiment', []) 
+                                     if ts.get('ticker') == symbol), 0)
+                }
+                for a in articles[:5]  # Top 5 recent articles
+            ]
+        }
+    
+    def _get_sentiment_label(self, score: float) -> str:
+        """Converts sentiment score to label"""
+        if score > 0.25:
+            return "Bullish"
+        elif score > 0.05:
+            return "Somewhat-Bullish"
+        elif score < -0.25:
+            return "Bearish"
+        elif score < -0.05:
+            return "Somewhat-Bearish"
+        else:
+            return "Neutral"
+    
+    def get_company_overview(self, symbol: str) -> Optional[Dict]:
+        """
+        Gets comprehensive company fundamentals.
+        Better than yfinance for some metrics.
+        """
+        params = {
+            "function": "OVERVIEW",
+            "symbol": symbol
+        }
+        
+        data = self._make_request(params)
+        if not data or 'Symbol' not in data:
+            return None
+        
+        return {
+            "symbol": data.get('Symbol', ''),
+            "name": data.get('Name', ''),
+            "description": data.get('Description', ''),
+            "sector": data.get('Sector', ''),
+            "industry": data.get('Industry', ''),
+            "market_cap": float(data.get('MarketCapitalization', 0)),
+            "pe_ratio": float(data.get('PERatio', 0)),
+            "peg_ratio": float(data.get('PEGRatio', 0)),
+            "book_value": float(data.get('BookValue', 0)),
+            "dividend_yield": float(data.get('DividendYield', 0)),
+            "eps": float(data.get('EPS', 0)),
+            "revenue_per_share": float(data.get('RevenuePerShareTTM', 0)),
+            "profit_margin": float(data.get('ProfitMargin', 0)),
+            "operating_margin": float(data.get('OperatingMarginTTM', 0)),
+            "roe": float(data.get('ReturnOnEquityTTM', 0)),
+            "roa": float(data.get('ReturnOnAssetsTTM', 0)),
+            "analyst_target_price": float(data.get('AnalystTargetPrice', 0)),
+            "52_week_high": float(data.get('52WeekHigh', 0)),
+            "52_week_low": float(data.get('52WeekLow', 0))
+        }
+

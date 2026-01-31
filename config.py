@@ -10,6 +10,7 @@ DARWINEX_ONLY = True  # Si es True, solo escanea activos de Darwinex para veloci
 # Dip Detection Settings
 DIP_DETECTION_ENABLED = True  # Enable institutional dip detection
 DIP_SCORE_THRESHOLD = 70      # Minimum score for "strong dip" classification
+USE_ALPHA_VANTAGE = True      # Use Alpha Vantage for enhanced sentiment (25 calls/day limit)
 
 # Dip Detection Thresholds
 DIP_THRESHOLDS = {

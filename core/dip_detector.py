@@ -14,6 +14,8 @@ class DipDetector:
     
     def __init__(self):
         self.finnhub = FinnhubClient()
+        from core.api_clients import AlphaVantageClient
+        self.alpha_vantage = AlphaVantageClient()
     
     def calculate_drawdown(self, df: pd.DataFrame, period: int = 20) -> Dict:
         """
@@ -167,28 +169,53 @@ class DipDetector:
     
     def score_sentiment(self, symbol: str) -> Dict:
         """
-        Scores news sentiment (0-10 pts).
+        Scores news sentiment (0-15 pts).
+        Uses Alpha Vantage (primary) with Finnhub fallback.
         Negative sentiment during a dip can be noise, but we want to avoid disasters.
         """
         score = 0
+        details = {}
         
-        sentiment_data = self.finnhub.get_news_sentiment(symbol)
-        if sentiment_data:
-            sentiment_score = sentiment_data.get('sentiment_score', 0)
+        # Try Alpha Vantage first (better sentiment analysis)
+        av_sentiment = self.alpha_vantage.get_news_sentiment(symbol)
+        if av_sentiment:
+            avg_sentiment = av_sentiment.get('average_sentiment', 0)
+            sentiment_label = av_sentiment.get('sentiment_label', 'Neutral')
             
-            # We're okay with slightly negative sentiment (it's a dip after all)
-            # But we want to avoid catastrophic news
-            if sentiment_score > -0.3:
+            # Alpha Vantage scoring (more granular)
+            if avg_sentiment > 0.15:  # Bullish
+                score += 15
+            elif avg_sentiment > 0.05:  # Somewhat bullish
                 score += 10
-            elif sentiment_score > -0.5:
+            elif avg_sentiment > -0.15:  # Neutral (okay for dips)
+                score += 7
+            elif avg_sentiment > -0.3:  # Slightly bearish (acceptable)
                 score += 5
+            # Below -0.3 = 0 points (avoid)
             
-            return {
-                "sentiment_score": score,
-                "details": sentiment_data
-            }
+            details['source'] = 'AlphaVantage'
+            details['sentiment_data'] = av_sentiment
+            details['sentiment_label'] = sentiment_label
+            
+        else:
+            # Fallback to Finnhub
+            sentiment_data = self.finnhub.get_news_sentiment(symbol)
+            if sentiment_data:
+                sentiment_score = sentiment_data.get('sentiment_score', 0)
+                
+                # Finnhub scoring (original logic)
+                if sentiment_score > -0.3:
+                    score += 10
+                elif sentiment_score > -0.5:
+                    score += 5
+                
+                details['source'] = 'Finnhub'
+                details['sentiment_data'] = sentiment_data
         
-        return {"sentiment_score": 0, "details": None}
+        return {
+            "sentiment_score": score,
+            "details": details
+        }
     
     def analyze_dip_opportunity(self, symbol: str) -> Optional[Dict]:
         """
