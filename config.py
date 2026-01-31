@@ -7,6 +7,18 @@
 WATCHLIST = ["AAPL", "TSLA", "NVDA", "BTC-USD"]
 DARWINEX_ONLY = True  # Si es True, solo escanea activos de Darwinex para velocidad extrema
 
+# Dip Detection Settings
+DIP_DETECTION_ENABLED = True  # Enable institutional dip detection
+DIP_SCORE_THRESHOLD = 70      # Minimum score for "strong dip" classification
+
+# Dip Detection Thresholds
+DIP_THRESHOLDS = {
+    "MIN_DRAWDOWN": -30,      # Maximum acceptable drawdown (%)
+    "MAX_DRAWDOWN": -10,      # Minimum drawdown to qualify as "dip" (%)
+    "LOOKBACK_DAYS": 20,      # Days to look back for high
+    "DIVERGENCE_PERIOD": 5,   # Days to check for OBV divergence
+}
+
 # Criteria Thresholds
 THRESHOLDS = {
     "MAX_PE_RATIO": 35.0,        # Maximum Price to Earnings

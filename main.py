@@ -4,13 +4,14 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from core.scanner import Scanner
 from core.tickers import TickerSource
-from config import WATCHLIST, DARWINEX_ONLY
+from core.dip_detector import DipDetector
+from config import WATCHLIST, DARWINEX_ONLY, DIP_DETECTION_ENABLED
 from pydantic import BaseModel
 import asyncio
 import time
 import os
 
-app = FastAPI(title="Smart Money Scanner API", version="2.9.2")
+app = FastAPI(title="Smart Money Scanner API", version="3.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -28,6 +29,7 @@ async def serve_spa():
     return FileResponse("public/index.html")
 
 scanner = Scanner()
+dip_detector = DipDetector()
 
 # Global state to track worker
 worker_status = {
@@ -127,6 +129,49 @@ def force_update(background_tasks: BackgroundTasks):
 @app.get("/api/analyze/{symbol}")
 def analyze_one(symbol: str):
     result = scanner.scan_ticker(symbol.upper())
+    return result
+
+@app.get("/api/scan-dips")
+def get_dip_opportunities(limit: int = 10, min_score: int = 70):
+    """
+    Scans for institutional dip buying opportunities.
+    Returns stocks with significant price drops showing institutional accumulation.
+    """
+    if not DIP_DETECTION_ENABLED:
+        return {"error": "Dip detection is disabled. Enable in config.py"}
+    
+    # Get top candidates from main scanner first (pre-filter)
+    candidates = scanner.get_results_from_db(min_score=50, limit=100)
+    
+    dip_opportunities = []
+    for candidate in candidates:
+        symbol = candidate['symbol']
+        dip_result = dip_detector.analyze_dip_opportunity(symbol)
+        
+        if dip_result and dip_result['dip_score'] >= min_score:
+            dip_opportunities.append(dip_result)
+    
+    # Sort by dip score
+    dip_opportunities.sort(key=lambda x: x['dip_score'], reverse=True)
+    
+    return {
+        "conteo": len(dip_opportunities[:limit]),
+        "resultados": dip_opportunities[:limit]
+    }
+
+@app.get("/api/institutional/{symbol}")
+def get_institutional_analysis(symbol: str):
+    """
+    Returns detailed institutional analysis for a single stock.
+    Includes ownership, insider transactions, analyst recommendations, and dip score.
+    """
+    if not DIP_DETECTION_ENABLED:
+        return {"error": "Dip detection is disabled. Enable in config.py"}
+    
+    result = dip_detector.analyze_dip_opportunity(symbol.upper())
+    if not result:
+        return {"error": f"Could not analyze {symbol}"}
+    
     return result
 
 if __name__ == "__main__":
