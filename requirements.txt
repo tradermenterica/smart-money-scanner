@@ -6,3 +6,4 @@ numpy
 requests
 python-multipart
 finnhub-python
+python-dotenv

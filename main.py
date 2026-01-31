@@ -11,6 +11,10 @@ import asyncio
 import time
 import os
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()  # This loads all API keys automatically
+
 app = FastAPI(title="Smart Money Scanner API", version="3.0.0")
 
 app.add_middleware(
