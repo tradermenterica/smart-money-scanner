@@ -175,30 +175,44 @@ def get_dip_opportunities(limit: int = 10, min_score: int = 70):
     # Analyze candidates
     for symbol in symbols:
         try:
-            # Extract single ticker DF from batch result
-            if len(symbols) > 1:
-                # When multiple tickers, yfinance returns MultiIndex (Symbol, OHLCV)
-                # accessing batch_data[symbol] might fail if symbol download failed
-                if symbol not in batch_data.columns.get_level_values(1): # Check checking level 1 if format is Price, Ticker
-                   # yfinance structure varies. Usually it's close[symbol] or batch[symbol]
-                   # Let's rely on standard yfinance batch structure: 
-                   # It returns columns like (Price, Ticker). 
-                   # Easier way: slice cross section
-                   try:
-                       ticker_df = batch_data.xs(symbol, axis=1, level=1)
-                   except:
-                       continue
+            ticker_df = pd.DataFrame()
+            
+            # Robust extraction of single ticker from batch
+            if isinstance(batch_data.columns, pd.MultiIndex):
+                # Structure: (Ticker, OHLCV) OR (OHLCV, Ticker)
+                try:
+                    # Try accessing top level (Ticker) 
+                    ticker_df = batch_data[symbol]
+                except KeyError:
+                    # Maybe Ticker is at level 1?
+                    try:
+                        ticker_df = batch_data.xs(symbol, axis=1, level=1)
+                    except:
+                        continue
             else:
-                ticker_df = batch_data
+                # Flat DataFrame (usually implies single ticker result)
+                # Check if this flat DF belongs to the requested symbol
+                # When yfinance downloads 1 ticker, it returns flat DF
+                if len(symbols) == 1 and symbol == symbols[0]:
+                    ticker_df = batch_data
+                else:
+                    # We have a flat DF but looping through multiple symbols?
+                    # This implies only one symbol succeeded or bad structure
+                    continue
 
             if ticker_df.empty: 
                 continue
-                
+            
+            # Ensure index is datetime (sometimes lost)
+            if not isinstance(ticker_df.index, pd.DatetimeIndex):
+                ticker_df.index = pd.to_datetime(ticker_df.index)
+
             dip_result = dip_detector.analyze_dip_opportunity(symbol, df=ticker_df)
             
             if dip_result and dip_result['dip_score'] >= min_score:
                 dip_opportunities.append(dip_result)
         except Exception as e:
+            # print(f"Error processing {symbol}: {e}")
             continue
     
     # Sort by dip score
