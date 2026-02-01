@@ -15,7 +15,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()  # This loads all API keys automatically
 
-app = FastAPI(title="Smart Money Scanner API", version="3.0.0")
+app = FastAPI(title="Smart Money Scanner API", version="3.1.0", debug=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +24,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global Exception Handler for debugging 500 errors
+from fastapi.responses import JSONResponse
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    import traceback
+    error_detail = traceback.format_exc()
+    print(f"CRITICAL ERROR: {error_detail}")
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal Server Error", "detail": str(exc), "traceback": error_detail}
+    )
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="public"), name="static")
