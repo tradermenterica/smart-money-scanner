@@ -165,14 +165,41 @@ def get_dip_opportunities(limit: int = 10, min_score: int = 70):
     
     # Analyze candidates
     # The dip_detector now has a "Fail Fast" mechanism so it's safe to loop through many
-    for candidate in candidates:
-        symbol = candidate['symbol']
-        # Pass current price if available to avoid re-fetching in simple checks?
-        # For now, analyze_dip_opportunity fetches its own data, which is cached by DataFetcher
-        dip_result = dip_detector.analyze_dip_opportunity(symbol)
-        
-        if dip_result and dip_result['dip_score'] >= min_score:
-            dip_opportunities.append(dip_result)
+    symbols = [c['symbol'] for c in candidates]
+    
+    # BATCH DATA FETCH (Much Faster)
+    # Fetch all data in one go instead of 100 sequential requests
+    print(f"[DIP] Fetching batch data for {len(symbols)} tickers...")
+    batch_data = DataFetcher.get_batch_history(symbols, period="6mo")
+    
+    # Analyze candidates
+    for symbol in symbols:
+        try:
+            # Extract single ticker DF from batch result
+            if len(symbols) > 1:
+                # When multiple tickers, yfinance returns MultiIndex (Symbol, OHLCV)
+                # accessing batch_data[symbol] might fail if symbol download failed
+                if symbol not in batch_data.columns.get_level_values(1): # Check checking level 1 if format is Price, Ticker
+                   # yfinance structure varies. Usually it's close[symbol] or batch[symbol]
+                   # Let's rely on standard yfinance batch structure: 
+                   # It returns columns like (Price, Ticker). 
+                   # Easier way: slice cross section
+                   try:
+                       ticker_df = batch_data.xs(symbol, axis=1, level=1)
+                   except:
+                       continue
+            else:
+                ticker_df = batch_data
+
+            if ticker_df.empty: 
+                continue
+                
+            dip_result = dip_detector.analyze_dip_opportunity(symbol, df=ticker_df)
+            
+            if dip_result and dip_result['dip_score'] >= min_score:
+                dip_opportunities.append(dip_result)
+        except Exception as e:
+            continue
     
     # Sort by dip score
     dip_opportunities.sort(key=lambda x: x['dip_score'], reverse=True)

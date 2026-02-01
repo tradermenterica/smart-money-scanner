@@ -252,14 +252,16 @@ class DipDetector:
             "details": details
         }
     
-    def analyze_dip_opportunity(self, symbol: str) -> Optional[Dict]:
+    def analyze_dip_opportunity(self, symbol: str, df: Optional[pd.DataFrame] = None) -> Optional[Dict]:
         """
         Full analysis of a potential dip buying opportunity.
         Returns score (0-100) and detailed breakdown.
         """
         try:
-            # Get price data
-            df = DataFetcher.get_history(symbol)
+            # Get price data (use provided DF or fetch new)
+            if df is None or df.empty:
+                df = DataFetcher.get_history(symbol)
+                
             if df.empty or len(df) < 50:
                 return None
             
