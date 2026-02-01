@@ -218,9 +218,25 @@ def get_dip_opportunities(limit: int = 10, min_score: int = 70):
     # Sort by dip score
     dip_opportunities.sort(key=lambda x: x['dip_score'], reverse=True)
     
+    # Sanitize for JSON (Recursively replace NaN/Inf with None)
+    # This prevents 500 errors when yfinance returns funky float values
+    import math
+    def sanitize_for_json(obj):
+        if isinstance(obj, float):
+            if math.isnan(obj) or math.isinf(obj):
+                return None
+            return obj
+        if isinstance(obj, dict):
+            return {k: sanitize_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [sanitize_for_json(v) for v in obj]
+        return obj
+
+    final_result = sanitize_for_json(dip_opportunities)
+    
     return {
-        "conteo": len(dip_opportunities[:limit]),
-        "resultados": dip_opportunities[:limit]
+        "conteo": len(final_result[:limit]),
+        "resultados": final_result[:limit]
     }
 
 @app.get("/api/institutional/{symbol}")
