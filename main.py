@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from core.scanner import Scanner
 from core.tickers import TickerSource
 from core.dip_detector import DipDetector
+from core.data import DataFetcher
 from config import WATCHLIST, DARWINEX_ONLY, DIP_DETECTION_ENABLED
 from pydantic import BaseModel
 import asyncio
