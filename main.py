@@ -149,7 +149,7 @@ def analyze_one(symbol: str):
     return result
 
 @app.get("/api/scan-dips")
-def get_dip_opportunities(limit: int = 10, min_score: int = 40):
+def get_dip_opportunities(limit: int = 10):
     """
     Scans for institutional dip buying opportunities.
     Returns stocks with significant price drops showing institutional accumulation.
@@ -210,7 +210,7 @@ def get_dip_opportunities(limit: int = 10, min_score: int = 40):
 
             dip_result = dip_detector.analyze_dip_opportunity(symbol, df=ticker_df)
             
-            if dip_result and dip_result['dip_score'] >= min_score:
+            if dip_result:
                 dip_opportunities.append(dip_result)
         except Exception as e:
             # print(f"Error processing {symbol}: {e}")

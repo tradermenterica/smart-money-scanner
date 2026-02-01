@@ -325,6 +325,8 @@ class DipDetector:
                     "symbol": symbol,
                     "dip_score": total_score,
                     "is_strong_dip": False,
+                    "conviccion_institucional": "BAJA",
+                    "conclusion": "Debilidad técnica; sin señales institucionales.",
                     "current_price": float(current_price),
                     "breakdown": breakdown,
                     "note": "Skipped external APIs due to low technical score"
@@ -353,10 +355,38 @@ class DipDetector:
             if drawdown['is_dip'] and obv_divergence and institutional['institutional_score'] > 20:
                 total_score += 10  # "Perfect Dip" bonus
             
+            # Determine Institutional Conviction (Spanish)
+            conviction_map = {
+                (70, 101): "MUY ALTA",
+                (50, 70): "ALTA",
+                (30, 50): "MEDIA",
+                (0, 30): "BAJA"
+            }
+            conviccion = "BAJA"
+            for (low, high), label in conviction_map.items():
+                if low <= total_score < high:
+                    conviccion = label
+                    break
+            
+            # Generate Quick Conclusion (Spanish)
+            conclusion = "Caída técnica detectada."
+            if drawdown['is_dip'] and obv_divergence:
+                conclusion = "Best Setup: Divergencia OBV + Caída Técnica."
+            elif institutional['institutional_score'] > 20:
+                conclusion = "Fuerte interés institucional detectado tras caída."
+            elif support['at_support']:
+                conclusion = "Precio en nivel de soporte clave."
+            elif fund_res['passed']:
+                conclusion = "Fundamentales sólidos; recuperación probable."
+            elif total_score > 70:
+                conclusion = "Alta probabilidad de rebote institucional."
+
             return {
                 "symbol": symbol,
                 "dip_score": min(total_score, 100),
                 "is_strong_dip": total_score >= 70,
+                "conviccion_institucional": conviccion,
+                "conclusion": conclusion,
                 "current_price": float(current_price),
                 "breakdown": breakdown
             }
