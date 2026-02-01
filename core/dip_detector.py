@@ -18,10 +18,10 @@ class DipDetector:
         self.alpha_vantage = AlphaVantageClient()
         self.sec_api = SECApiClient()
     
-    def calculate_drawdown(self, df: pd.DataFrame, period: int = 20) -> Dict:
+    def calculate_drawdown(self, df: pd.DataFrame, period: int = 50) -> Dict:
         """
         Calculates drawdown from recent high.
-        Returns drawdown percentage and days from high.
+        Increased lookback period to 50 days (was 20) to capture broader corrections.
         """
         if df.empty or len(df) < period:
             return {"drawdown_pct": 0, "days_from_high": 0, "is_dip": False}
@@ -41,8 +41,10 @@ class DipDetector:
         else:
             days_from_high = 0
         
-        # Is this a "dip" we're interested in? (-10% to -30%)
-        is_dip = -30 <= drawdown_pct <= -10
+        # Is this a "dip" we're interested in? 
+        # RELAXED CRITERIA: -5% to -35% (was -10% to -30%)
+        # Allows catching quality stocks correcting 5-9%
+        is_dip = -35 <= drawdown_pct <= -5
         
         return {
             "drawdown_pct": float(drawdown_pct),
@@ -277,7 +279,7 @@ class DipDetector:
             breakdown = {}
             
             # A. Technical Dip Analysis (0-30 pts)
-            drawdown = self.calculate_drawdown(df, period=20)
+            drawdown = self.calculate_drawdown(df, period=50)
             breakdown['drawdown'] = drawdown
             
             if drawdown['is_dip']:
