@@ -14,10 +14,9 @@ config.DIP_DETECTION_ENABLED = True
 async def test_batch_scan():
     print("--- Starting Debug Batch Scan ---")
     
-    # 1. Mock Candidates (Use typical tickers)
-    symbols = ['AAPL', 'TSLA', 'NVDA', 'AMD', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NFLX', 'BRK-B']
-    # Add a potentially problematic one?
-    symbols.append('HLT') 
+    # 1. Mock Candidates (Use confirmed dippers and big tech)
+    symbols = ['AVAV', 'TSLA', 'SMCI', 'NVDA', 'AMD', 'INTC', 'AAPL']
+    print(f"Testing specific symbols: {symbols}") 
     
     print(f"Fetching batch data for {len(symbols)} symbols...")
     try:
