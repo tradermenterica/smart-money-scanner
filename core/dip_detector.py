@@ -282,6 +282,18 @@ class DipDetector:
             
             if drawdown['is_dip']:
                 total_score += 15
+            else:
+                # OPTIMIZATION: Fail Fast
+                # If it's not a technical dip (-10% to -30%), don't waste API calls
+                # Return immediately unless it's a specific single-symbol request
+                pass 
+                # Note: We continue only if we want to debug, but for performance 
+                # we should return None here if called from scanner.
+                # However, for 'analyze_one' endpoint we might want full data.
+                # Let's start by NOT skipping, but we can filter in the caller?
+                # BETTER: Just skip the EXPENSIVE calls if score is already low.
+            
+            # ... Technicals are fast ...
             
             # OBV Divergence (bullish signal)
             obv_divergence = self.detect_obv_divergence(df, lookback=5)
@@ -294,6 +306,22 @@ class DipDetector:
             breakdown['support'] = support
             if support['at_support']:
                 total_score += 5
+                
+            # === PERFORMANCE OPTIMIZATION ===
+            # Stop here if technical score is too low (< 15)
+            # This avoids calling external APIs (Finnhub, SEC, AlphaVantage) for weak candidates
+            # Max technical score so far is 30. We want at least some technical signal.
+            technical_score = total_score
+            if technical_score < 10:
+                # Not worth checking expensive APIs
+                return {
+                    "symbol": symbol,
+                    "dip_score": total_score,
+                    "is_strong_dip": False,
+                    "current_price": float(current_price),
+                    "breakdown": breakdown,
+                    "note": "Skipped external APIs due to low technical score"
+                }
             
             # B. Institutional Conviction (0-40 pts)
             institutional = self.score_institutional_data(symbol, current_price)
