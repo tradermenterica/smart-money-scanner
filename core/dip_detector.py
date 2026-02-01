@@ -129,10 +129,13 @@ class DipDetector:
             if inst_ownership:
                 ownership_pct = inst_ownership.get('change_percentage', 0)
                 
-                if ownership_pct > 60:
-                    score += 10
+                # RECALIBRATION: User values ownership > 60% highly
+                if ownership_pct > 80:
+                    score += 25
+                elif ownership_pct > 60:
+                    score += 20  # Boosted from 10
                 elif ownership_pct > 40:
-                    score += 5
+                    score += 10 # Boosted from 5
                 
                 if inst_ownership.get('total_change', 0) > 0:
                     score += 15
@@ -285,7 +288,7 @@ class DipDetector:
             breakdown['drawdown'] = drawdown
             
             if drawdown['is_dip']:
-                total_score += 15
+                total_score += 30 # BOOSTED from 15: The dip itself is the main signal
             else:
                 # OPTIMIZATION: Fail Fast
                 # If it's not a technical dip (-10% to -30%), don't waste API calls
