@@ -96,7 +96,7 @@ class DipDetector:
         return {
             "near_sma50": bool(near_sma50),
             "near_sma200": bool(near_sma200),
-            "at_support": near_sma50 or near_sma200
+            "at_support": bool(near_sma50 or near_sma200)
         }
     
     def score_institutional_data(self, symbol: str, current_price: float) -> Dict:
