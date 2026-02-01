@@ -158,7 +158,8 @@ def get_dip_opportunities(limit: int = 10, min_score: int = 70):
     
     # Get ALL candidates from DB (don't filter by score because dips might have low momentum scores)
     # We fetch a larger pool to find those hidden gems that fell
-    candidates = scanner.get_results_from_db(min_score=0, limit=300)
+    # REDUCED LIMIT: 100 to prevent timeout (fetching 300 sync takes too long)
+    candidates = scanner.get_results_from_db(min_score=0, limit=100)
     
     dip_opportunities = []
     
