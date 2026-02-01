@@ -72,8 +72,12 @@ async def test_batch_scan():
             dip_result = dip_detector.analyze_dip_opportunity(symbol, df=ticker_df)
             
             if dip_result:
-                # print(f"  Result found for {symbol}: Score {dip_result['dip_score']}")
+                print(f"  Result found for {symbol}: Score {dip_result['dip_score']}")
+                print(f"    - Tech: {dip_result.get('breakdown', {}).get('drawdown', {}).get('drawdown_pct', 0):.2f}%")
+                print(f"    - Inst: {dip_result.get('institutional_score', 0)}")
                 dip_opportunities.append(dip_result)
+            else:
+                print(f"  No result for {symbol} (Score too low or invalid)")
             
         except Exception as e:
             print(f"  CRASH processing {symbol}: {e}")

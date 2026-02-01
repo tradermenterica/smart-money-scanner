@@ -149,7 +149,7 @@ def analyze_one(symbol: str):
     return result
 
 @app.get("/api/scan-dips")
-def get_dip_opportunities(limit: int = 10, min_score: int = 70):
+def get_dip_opportunities(limit: int = 10, min_score: int = 40):
     """
     Scans for institutional dip buying opportunities.
     Returns stocks with significant price drops showing institutional accumulation.
