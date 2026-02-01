@@ -156,12 +156,18 @@ def get_dip_opportunities(limit: int = 10, min_score: int = 70):
     if not DIP_DETECTION_ENABLED:
         return {"error": "Dip detection is disabled. Enable in config.py"}
     
-    # Get top candidates from main scanner first (pre-filter)
-    candidates = scanner.get_results_from_db(min_score=50, limit=100)
+    # Get ALL candidates from DB (don't filter by score because dips might have low momentum scores)
+    # We fetch a larger pool to find those hidden gems that fell
+    candidates = scanner.get_results_from_db(min_score=0, limit=300)
     
     dip_opportunities = []
+    
+    # Analyze candidates
+    # The dip_detector now has a "Fail Fast" mechanism so it's safe to loop through many
     for candidate in candidates:
         symbol = candidate['symbol']
+        # Pass current price if available to avoid re-fetching in simple checks?
+        # For now, analyze_dip_opportunity fetches its own data, which is cached by DataFetcher
         dip_result = dip_detector.analyze_dip_opportunity(symbol)
         
         if dip_result and dip_result['dip_score'] >= min_score:
