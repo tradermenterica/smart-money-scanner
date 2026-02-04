@@ -130,6 +130,10 @@ class Scanner:
                 # Bonus: RVOL during Squeeze/VCP combined with Institutional buying is "The Perfect Trade"
                 if (tech_res["squeeze"] or tech_res["vcp"]) and inst_res["detected"]:
                     score += 20
+                
+                # NEW Bonus: VSA Absorption "Effort vs Result" (PH Setup)
+                if tech_res.get("vsa_absorption"):
+                    score += 25
 
                 if score > 0:
                     result = {

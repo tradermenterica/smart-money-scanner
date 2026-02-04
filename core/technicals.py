@@ -32,6 +32,11 @@ class TechnicalAnalyzer:
         # Bandwidth
         self.df['BB_WIDTH'] = (self.df['BBU_20_2.0'] - self.df['BBL_20_2.0']) / sma20
 
+        # VSA Indicators
+        # 1. Spread (High - Low)
+        self.df['SPREAD'] = self.df['High'] - self.df['Low']
+        self.df['SPREAD_SMA_20'] = self.df['SPREAD'].rolling(window=20).mean()
+
     def check_setup(self) -> dict:
         """
         Detects if the stock is in a bullish setup.
@@ -68,11 +73,22 @@ class TechnicalAnalyzer:
         if pd.notnull(last['BBU_20_2.0']):
              breakout = last['Close'] > last['BBU_20_2.0']
 
+        # 5. VSA Absorption (Effort vs Result)
+        # High Volume + Narrow Spread = Institutional Absorption
+        vsa_absorption = False
+        if pd.notnull(last['RVOL']) and pd.notnull(last['SPREAD_SMA_20']):
+            # Condition: Volume > 1.6x Average AND Spread < 0.9x Average
+            # This captures high effort (volume) but little result (spread)
+            is_high_volume = last['RVOL'] > 1.6
+            is_narrow_spread = last['SPREAD'] < (last['SPREAD_SMA_20'] * 0.9)
+            vsa_absorption = is_high_volume and is_narrow_spread
+
         return {
             "trend": "Uptrend" if bullish_trend else "Downtrend",
             "squeeze": bool(is_squeezing),
             "vcp": bool(vcp),
             "breakout": bool(breakout),
+            "vsa_absorption": bool(vsa_absorption),
             "bandwidth": float(bandwidth),
             "rvol": float(last['RVOL']) if pd.notnull(last['RVOL']) else 0.0,
             "last_close": float(last['Close'])

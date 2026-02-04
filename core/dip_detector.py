@@ -313,6 +313,13 @@ class DipDetector:
             breakdown['support'] = support
             if support['at_support']:
                 total_score += 5
+            
+            # VSA Absorption (Effort vs Result - PH Setup)
+            tech_results = tech.check_setup()
+            vsa_absorption = tech_results.get("vsa_absorption", False)
+            breakdown['vsa_absorption'] = vsa_absorption
+            if vsa_absorption:
+                total_score += 25 # Major institutional signal
                 
             # === PERFORMANCE OPTIMIZATION ===
             # Stop here if technical score is too low (< 15)
@@ -370,7 +377,9 @@ class DipDetector:
             
             # Generate Quick Conclusion (Spanish)
             conclusion = "Caída técnica detectada."
-            if drawdown['is_dip'] and obv_divergence:
+            if vsa_absorption:
+                conclusion = "🚨 ALTA CONVICCIÓN: Absorción Institucional VSA (PH Setup)."
+            elif drawdown['is_dip'] and obv_divergence:
                 conclusion = "Best Setup: Divergencia OBV + Caída Técnica."
             elif institutional['institutional_score'] > 20:
                 conclusion = "Fuerte interés institucional detectado tras caída."
