@@ -8,6 +8,7 @@ from core.zones import ZoneDetector
 import concurrent.futures
 import time
 import pandas as pd
+from config import DIP_THRESHOLDS
 
 class Scanner:
     def __init__(self):
@@ -125,14 +126,18 @@ class Scanner:
                 
                 # ========================================
                 # STRICT FILTER 1: PULLBACK DETECTION
-                # Stock MUST be in -15% to -50% pullback from 60-day high
+                # Stock MUST be in configurable range from N-day high
                 # ========================================
-                high_60d = float(df['High'].tail(60).max())
+                lookback = DIP_THRESHOLDS.get("LOOKBACK_DAYS", 60)
+                min_dd = DIP_THRESHOLDS.get("MIN_DRAWDOWN", -45)
+                max_dd = DIP_THRESHOLDS.get("MAX_DRAWDOWN", -10)
+                
+                high_60d = float(df['High'].tail(lookback).max())
                 current_price = float(df['Close'].iloc[-1])
                 drawdown_pct = ((current_price - high_60d) / high_60d) * 100
                 
                 # REJECT if not in pullback range
-                if not (-50 < drawdown_pct < -15):
+                if not (min_dd < drawdown_pct < max_dd):
                     continue  # Skip - No significant pullback (XOM/CAT/COST rejected here)
                 
                 # ========================================
@@ -148,9 +153,9 @@ class Scanner:
                 
                 # ========================================
                 # STRICT FILTER 3: SUPPORT ZONE POSITION
-                # Price MUST be in lower 40% of 60-day range
+                # Price MUST be in lower 40% of range
                 # ========================================
-                low_60d = float(df['Low'].tail(60).min())
+                low_60d = float(df['Low'].tail(lookback).min())
                 range_60d = high_60d - low_60d
                 if range_60d > 0:
                     position_60d = (current_price - low_60d) / range_60d

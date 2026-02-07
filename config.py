@@ -15,10 +15,10 @@ USE_SEC_API = True            # Use sec-api.io for real SEC filings data (13F, F
 
 # Dip Detection Thresholds
 DIP_THRESHOLDS = {
-    "MIN_DRAWDOWN": -30,      # Maximum acceptable drawdown (%)
-    "MAX_DRAWDOWN": -10,      # Minimum drawdown to qualify as "dip" (%)
-    "LOOKBACK_DAYS": 20,      # Days to look back for high
-    "DIVERGENCE_PERIOD": 5,   # Days to check for OBV divergence
+    "MIN_DRAWDOWN": -45,      # Maximum acceptable drawdown (%) - Changed from -30
+    "MAX_DRAWDOWN": -10,      # Minimum drawdown to qualify as "dip" (%) - Changed from -10 (kept but relaxed in Scanner)
+    "LOOKBACK_DAYS": 60,      # Days to look back for high - Unified with Scanner's 60d
+    "DIVERGENCE_PERIOD": 10,  # Days to check for OBV divergence
 }
 
 # Criteria Thresholds
