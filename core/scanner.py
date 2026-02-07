@@ -109,97 +109,92 @@ class Scanner:
                 inst_res = inst.detect_smart_money()
 
                 # ========================================
-                # NEW DETECTION: MONEY FLOW + SUPPLY/DEMAND ZONES
-                # Goal: Detect stocks with RECENT money flow (last 5 days) in DEMAND zones
-                # Reject: Stocks in supply zones or without recent signals
+                # COMPLETE REWRITE: SMART MONEY DIP BUY DETECTION
+                # Pattern: CNC, APOV (pullback + accumulation)
+                # Reject: XOM, CAT, COST (active rallies)
                 # ========================================
                 
-                # 4. Money Flow Analysis (replaces OBV divergence)
+                # ========================================
+                # STRICT FILTER 1: PULLBACK DETECTION
+                # Stock MUST be in -15% to -50% pullback from 60-day high
+                # ========================================
+                high_60d = float(df['High'].tail(60).max())
+                current_price = float(df['Close'].iloc[-1])
+                drawdown_pct = ((current_price - high_60d) / high_60d) * 100
+                
+                # REJECT if not in pullback range
+                if not (-50 < drawdown_pct < -15):
+                    continue  # Skip - No significant pullback (XOM/CAT/COST rejected here)
+                
+                # ========================================
+                # STRICT FILTER 2: MONEY FLOW DURING PULLBACK
+                # Signals MUST appear while price is NOT rallying
+                # ========================================
                 mf_detector = MoneyFlowDetector(df)
-                mf_signals = mf_detector.detect_signals(lookback=5)
+                pullback_acc = mf_detector.detect_pullback_accumulation(lookback=10)
                 
-                # 5. Zone Analysis
-                zone_detector = ZoneDetector(df)
-                current_zone = zone_detector.get_current_zone_type()
-                price_position = zone_detector.get_position_in_range()
+                # REJECT if no accumulation during pullback
+                if not pullback_acc['has_pullback_accumulation']:
+                    continue  # Skip - No accumulation OR signals during rally
                 
-                # STRICT FILTER 1: Must have recent money flow signals
-                if not mf_signals['has_recent_flow']:
-                    continue  # Skip - no money flow in last 5 days
+                # ========================================
+                # STRICT FILTER 3: SUPPORT ZONE POSITION
+                # Price MUST be in lower 40% of 60-day range
+                # ========================================
+                low_60d = float(df['Low'].tail(60).min())
+                range_60d = high_60d - low_60d
+                if range_60d > 0:
+                    position_60d = (current_price - low_60d) / range_60d
+                else:
+                    position_60d = 0.5
                 
-                # STRICT FILTER 2: Cannot be in supply zone (resistance)
-                if current_zone == 'supply':
-                    continue  # Skip - in resistance/distribution zone
+                # REJECT if too high in range
+                if position_60d > 0.40:
+                    continue  # Skip - Not in support zone
                 
-                # STRICT FILTER 3: Cannot be in upper range (too extended)
-                if price_position > 0.65:
-                    continue  # Skip - too high in range
+                # ========================================
+                # PASSED ALL 3 FILTERS - VALID SETUP
+                # ========================================
                 
-                # STRICT FILTER 4: Reject if already had breakout
-                if tech_res.get("breakout"):
-                    continue  # Skip - already exploded
+                # Simple scoring for valid setups
+                score = 70  # Base score for passing all filters
                 
-                # === NEW SCORING SYSTEM ===
-                score = 0
+                # Bonus for setup strength
+                if pullback_acc['signal_count'] >= 3:
+                    score += 15  # Multiple signals
+                if abs(drawdown_pct) > 30:
+                    score += 10  # Deep pullback (more upside potential)
+                if position_60d < 0.25:
+                    score += 10  # Very low in range
                 
-                # A. Money Flow Signals (CORE - highest priority)
-                if mf_signals['signal_count'] >= 3:
-                    score += 60  # Multiple strong signals recently
-                elif mf_signals['signal_count'] >= 2:
-                    score += 45  # Minimum required signals
-                
-                # B. Zone Position (High priority)
-                if current_zone == 'demand':
-                    score += 30  # In demand zone (blue/support)
-                
-                if price_position < 0.4:
-                    score += 20  # In lower 40% of range (ideal)
-                elif price_position < 0.6:
-                    score += 10  # In middle range (acceptable)
-                
-                # C. Institutional Activity
-                if inst_res["detected"]: 
-                    score += 20
-                if inst_res["institutional_score"] >= 6: 
+                # Institutional confirmation
+                if inst_res["detected"]:
                     score += 10
                 
-                # D. Technical Confirmation (Lower weight)
-                if tech_res.get("vsa_absorption"):
-                    score += 15
-                if tech_res.get("squeeze"):
-                    score += 10
-                if tech_res.get("vcp"):
+                # Fundamentals
+                if fund_res["passed"]:
                     score += 5
-                
-                # E. Volume (Progressive, not explosive)
-                if 1.2 <= tech_res["rvol"] <= 2.5:
-                    score += 10
-                elif tech_res["rvol"] > 2.5:
-                    score -= 15  # Penalize explosive volume
-                
-                # F. Fundamentals
-                if fund_res["passed"]: 
-                    score += 10
 
-                if score > 0:
-                    # Add money flow and zone info to result
-                    tech_res['money_flow_signals'] = mf_signals['signal_count']
-                    tech_res['current_zone'] = current_zone
-                    tech_res['price_position'] = round(price_position, 2)
-                    
-                    result = {
-                        "symbol": symbol,
-                        "passed_financials": fund_res["passed"],
-                        "score": min(score, 100), # Cap at 100
-                        "details": {
-                            "fundamentals": fund_res,
-                            "technicals": tech_res,
-                            "institutional": inst_res
-                        }
+                # Prepare result with detailed info
+                tech_res['pullback_pct'] = round(drawdown_pct, 2)
+                tech_res['mf_signals'] = pullback_acc['signal_count']
+                tech_res['price_action'] = pullback_acc['price_action']
+                tech_res['range_position_60d'] = round(position_60d, 2)
+                
+                result = {
+                    "symbol": symbol,
+                    "passed_financials": fund_res["passed"],
+                    "score": min(score, 100),
+                    "details": {
+                        "fundamentals": fund_res,
+                        "technicals": tech_res,
+                        "institutional": inst_res,
+                        "setup_type": "Smart Money Dip Buy"
                     }
-                    self.db.save_result(result)
+                }
+                self.db.save_result(result)
             except Exception as e:
-                pass # Silencioso para no ensuciar logs masivos
+                pass  # Silencioso para no ensuciar logs masivos
 
     def run_full_scan_to_db(self, tickers: list):
         """

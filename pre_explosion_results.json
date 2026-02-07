@@ -1,0 +1,29 @@
+[
+    {
+        "symbol": "BDX",
+        "score": 70,
+        "change": 2.273288224773574,
+        "tech": {
+            "trend": "Uptrend",
+            "squeeze": true,
+            "vcp": false,
+            "breakout": false,
+            "vsa_absorption": false,
+            "bandwidth": 0.043307920024921155,
+            "rvol": 1.550828134274043,
+            "last_close": 206.5
+        },
+        "inst": {
+            "detected": true,
+            "institutional_score": 7,
+            "signals": [
+                "High Institutional Sentiment (LuxAlgo)",
+                "Money Flow Accumulation"
+            ],
+            "sentiment_ratio": 0.6428571428571429,
+            "mfi": 57.59053470548905,
+            "obv_trend": "Rising"
+        },
+        "conclusion": false
+    }
+]

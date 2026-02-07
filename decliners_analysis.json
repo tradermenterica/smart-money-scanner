@@ -1,0 +1,217 @@
+[
+  {
+    "symbol": "NEM",
+    "dip_score": 50,
+    "is_strong_dip": false,
+    "conviccion_institucional": "ALTA",
+    "conclusion": "Best Setup: Divergencia OBV + Ca\u00edda T\u00e9cnica.",
+    "current_price": 117.13999938964844,
+    "breakdown": {
+      "drawdown": {
+        "drawdown_pct": -11.223946874665726,
+        "recent_high": 131.9499969482422,
+        "current_price": 117.13999938964844,
+        "days_from_high": 4,
+        "is_dip": true
+      },
+      "obv_divergence": true,
+      "support": {
+        "near_sma50": false,
+        "near_sma200": false,
+        "at_support": false
+      },
+      "vsa_absorption": false,
+      "institutional": {
+        "institutional_score": 0,
+        "details": {}
+      },
+      "sentiment": {
+        "sentiment_score": 0,
+        "details": {}
+      },
+      "fundamentals": {
+        "passed": true,
+        "details": {
+          "pe": 18.21773,
+          "debt_to_equity": 16.914,
+          "roe": 0.22875999
+        },
+        "failure_reasons": []
+      }
+    }
+  },
+  {
+    "symbol": "RCL",
+    "dip_score": 30,
+    "is_strong_dip": false,
+    "conviccion_institucional": "MEDIA",
+    "conclusion": "Ca\u00edda t\u00e9cnica detectada.",
+    "current_price": 326.2900085449219,
+    "breakdown": {
+      "drawdown": {
+        "drawdown_pct": -5.691080934205857,
+        "recent_high": 345.9800109863281,
+        "current_price": 326.2900085449219,
+        "days_from_high": 3,
+        "is_dip": true
+      },
+      "obv_divergence": false,
+      "support": {
+        "near_sma50": false,
+        "near_sma200": false,
+        "at_support": false
+      },
+      "vsa_absorption": false,
+      "institutional": {
+        "institutional_score": 0,
+        "details": {}
+      },
+      "sentiment": {
+        "sentiment_score": 0,
+        "details": {}
+      },
+      "fundamentals": {
+        "passed": false,
+        "details": {
+          "pe": 20.916025,
+          "debt_to_equity": 215.081,
+          "roe": 0.47731
+        },
+        "failure_reasons": [
+          "High Debt/Equity (2.15)"
+        ]
+      }
+    }
+  },
+  {
+    "symbol": "AMD",
+    "dip_score": 30,
+    "is_strong_dip": false,
+    "conviccion_institucional": "MEDIA",
+    "conclusion": "Ca\u00edda t\u00e9cnica detectada.",
+    "current_price": 242.11000061035156,
+    "breakdown": {
+      "drawdown": {
+        "drawdown_pct": -6.76601685188985,
+        "recent_high": 259.67999267578125,
+        "current_price": 242.11000061035156,
+        "days_from_high": 7,
+        "is_dip": true
+      },
+      "obv_divergence": false,
+      "support": {
+        "near_sma50": false,
+        "near_sma200": false,
+        "at_support": false
+      },
+      "vsa_absorption": false,
+      "institutional": {
+        "institutional_score": 0,
+        "details": {}
+      },
+      "sentiment": {
+        "sentiment_score": 0,
+        "details": {}
+      },
+      "fundamentals": {
+        "passed": false,
+        "details": {
+          "pe": 92.76246,
+          "debt_to_equity": 6.366,
+          "roe": 0.05317
+        },
+        "failure_reasons": [
+          "P/E Too High (92.76246)",
+          "High Debt/Equity (6.37)",
+          "Low ROE (5.32%)"
+        ]
+      }
+    }
+  },
+  {
+    "symbol": "LRCX",
+    "dip_score": 40,
+    "is_strong_dip": false,
+    "conviccion_institucional": "MEDIA",
+    "conclusion": "Best Setup: Divergencia OBV + Ca\u00edda T\u00e9cnica.",
+    "current_price": 230.10000610351562,
+    "breakdown": {
+      "drawdown": {
+        "drawdown_pct": -7.281295965972599,
+        "recent_high": 248.1699981689453,
+        "current_price": 230.10000610351562,
+        "days_from_high": 3,
+        "is_dip": true
+      },
+      "obv_divergence": true,
+      "support": {
+        "near_sma50": false,
+        "near_sma200": false,
+        "at_support": false
+      },
+      "vsa_absorption": false,
+      "institutional": {
+        "institutional_score": 0,
+        "details": {}
+      },
+      "sentiment": {
+        "sentiment_score": 0,
+        "details": {}
+      },
+      "fundamentals": {
+        "passed": false,
+        "details": {
+          "pe": 47.151638,
+          "debt_to_equity": 44.195,
+          "roe": 0.65565
+        },
+        "failure_reasons": [
+          "P/E Too High (47.151638)"
+        ]
+      }
+    }
+  },
+  {
+    "symbol": "AMAT",
+    "dip_score": 40,
+    "is_strong_dip": false,
+    "conviccion_institucional": "MEDIA",
+    "conclusion": "Best Setup: Divergencia OBV + Ca\u00edda T\u00e9cnica.",
+    "current_price": 318.6700134277344,
+    "breakdown": {
+      "drawdown": {
+        "drawdown_pct": -6.641466910814446,
+        "recent_high": 341.3399963378906,
+        "current_price": 318.6700134277344,
+        "days_from_high": 3,
+        "is_dip": true
+      },
+      "obv_divergence": true,
+      "support": {
+        "near_sma50": false,
+        "near_sma200": false,
+        "at_support": false
+      },
+      "vsa_absorption": false,
+      "institutional": {
+        "institutional_score": 0,
+        "details": {}
+      },
+      "sentiment": {
+        "sentiment_score": 0,
+        "details": {}
+      },
+      "fundamentals": {
+        "passed": false,
+        "details": {
+          "pe": 36.75548,
+          "debt_to_equity": 34.533,
+          "roe": 0.35508
+        },
+        "failure_reasons": [
+          "P/E Too High (36.75548)"
+        ]
+      }
+    }
+  }
+]
