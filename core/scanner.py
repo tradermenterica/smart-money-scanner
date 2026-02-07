@@ -7,6 +7,7 @@ from core.money_flow import MoneyFlowDetector
 from core.zones import ZoneDetector
 import concurrent.futures
 import time
+import pandas as pd
 
 class Scanner:
     def __init__(self):
@@ -81,13 +82,21 @@ class Scanner:
         for symbol in batch_symbols:
             try:
                 # Extraer el DataFrame de este símbolo del objeto multi-ticker
-                if len(batch_symbols) > 1:
-                    df = batch_data[symbol]
+                if isinstance(batch_data.columns, pd.MultiIndex):
+                    try:
+                        df = batch_data[symbol]
+                    except KeyError:
+                        try:
+                            df = batch_data.xs(symbol, axis=1, level=1)
+                        except:
+                            continue
                 else:
-                    df = batch_data
+                    df = batch_data if len(batch_symbols) == 1 else pd.DataFrame()
                 
                 if df.empty or 'Close' not in df.columns or df['Close'].isnull().all():
                     continue
+
+                print(f"    [CHECK] {symbol} (Drawdown/Volume)...")
 
                 # 1. Filtro Técnico Rápido (Se hace en memoria, es instantáneo)
                 tech = TechnicalAnalyzer(df)
@@ -208,8 +217,10 @@ class Scanner:
         for i in range(0, total, chunk_size):
             chunk = tickers[i : i + chunk_size]
             print(f"  -> Procesando lote {i//chunk_size + 1} ({i}/{total})...")
+            # Update global status if possible (assuming worker_status is imported or accessible)
+            # For now, print is the safest for logs
             self.process_batch(chunk)
-            time.sleep(1) # Pequeño respiro para evitar bloqueos
+            time.sleep(2) # Respiro más largo para evitar rate-limiting en la nube
             
         print(f"[SCANNER] Escaneo completo.")
 

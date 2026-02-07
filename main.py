@@ -95,8 +95,16 @@ async def run_background_worker(force_clean: bool = False):
         print(f"[SISTEMA] Escaneando {len(full_list)} activos en segundo plano (Modo: {'Darwinex' if DARWINEX_ONLY else 'Total'})...")
         
         # Ejecución en hilo separado para no bloquear la API
-        await asyncio.to_thread(scanner.run_full_scan_to_db, full_list)
+        # Pass a callback or just update status periodically?
+        # Let's do a simpler approach: update progress as chunks are processed
+        chunk_size = 100
+        for i in range(0, len(full_list), chunk_size):
+            chunk = full_list[i : i + chunk_size]
+            worker_status["progress"] = int((i / len(full_list)) * 100)
+            await asyncio.to_thread(scanner.process_batch, chunk)
+            await asyncio.sleep(1)
         
+        worker_status["progress"] = 100
         worker_status["last_run"] = time.ctime()
         print(f"[SISTEMA] Actualización completa terminada.")
     except Exception as e:
