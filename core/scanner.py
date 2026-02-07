@@ -3,6 +3,8 @@ from core.financials import FundamentalAnalyzer
 from core.technicals import TechnicalAnalyzer
 from core.institutional import InstitutionalDetector
 from core.database import DatabaseManager
+from core.money_flow import MoneyFlowDetector
+from core.zones import ZoneDetector
 import concurrent.futures
 import time
 
@@ -107,62 +109,84 @@ class Scanner:
                 inst_res = inst.detect_smart_money()
 
                 # ========================================
-                # NEW SCORING LOGIC: "EARLY ACCUMULATION ONLY"
-                # Goal: Detect BAX Image 2 (BEFORE explosion), reject AMGN Image 1 (AFTER explosion)
+                # NEW DETECTION: MONEY FLOW + SUPPLY/DEMAND ZONES
+                # Goal: Detect stocks with RECENT money flow (last 5 days) in DEMAND zones
+                # Reject: Stocks in supply zones or without recent signals
                 # ========================================
                 
-                # STRICT FILTER: Reject if already in breakout
-                # If price moved >3% above SMA10 in last 1 day, it's too late
-                sma_10 = tech_res.get("sma_10", 0)
-                if sma_10 > 0 and tech_res["last_close"] > (sma_10 * 1.03):
-                    continue  # Skip - already breaking out
+                # 4. Money Flow Analysis (replaces OBV divergence)
+                mf_detector = MoneyFlowDetector(df)
+                mf_signals = mf_detector.detect_signals(lookback=5)
                 
-                # STRICT FILTER: Reject if already had breakout signal
+                # 5. Zone Analysis
+                zone_detector = ZoneDetector(df)
+                current_zone = zone_detector.get_current_zone_type()
+                price_position = zone_detector.get_position_in_range()
+                
+                # STRICT FILTER 1: Must have recent money flow signals
+                if not mf_signals['has_recent_flow']:
+                    continue  # Skip - no money flow in last 5 days
+                
+                # STRICT FILTER 2: Cannot be in supply zone (resistance)
+                if current_zone == 'supply':
+                    continue  # Skip - in resistance/distribution zone
+                
+                # STRICT FILTER 3: Cannot be in upper range (too extended)
+                if price_position > 0.65:
+                    continue  # Skip - too high in range
+                
+                # STRICT FILTER 4: Reject if already had breakout
                 if tech_res.get("breakout"):
                     continue  # Skip - already exploded
                 
+                # === NEW SCORING SYSTEM ===
                 score = 0
                 
-                # === CORE SIGNAL: Early Accumulation (Image 2 Setup) ===
-                if tech_res.get("early_accumulation"):
-                    score += 60  # MASSIVE bonus - this is THE signal we want
-                else:
-                    # If no early accumulation, only proceed if other strong signals exist
-                    # This ensures we don't get garbage results
-                    if not (tech_res.get("vsa_absorption") or (tech_res.get("squeeze") and inst_res["detected"])):
-                        continue  # Skip - no high-conviction setup
+                # A. Money Flow Signals (CORE - highest priority)
+                if mf_signals['signal_count'] >= 3:
+                    score += 60  # Multiple strong signals recently
+                elif mf_signals['signal_count'] >= 2:
+                    score += 45  # Minimum required signals
                 
-                # === Supporting Signals ===
+                # B. Zone Position (High priority)
+                if current_zone == 'demand':
+                    score += 30  # In demand zone (blue/support)
                 
-                # A. Institutional Activity
+                if price_position < 0.4:
+                    score += 20  # In lower 40% of range (ideal)
+                elif price_position < 0.6:
+                    score += 10  # In middle range (acceptable)
+                
+                # C. Institutional Activity
                 if inst_res["detected"]: 
-                    score += 25
+                    score += 20
                 if inst_res["institutional_score"] >= 6: 
-                    score += 10  # LuxAlgo high conviction
+                    score += 10
                 
-                # B. Technical Setups (Lower priority than early accumulation)
+                # D. Technical Confirmation (Lower weight)
                 if tech_res.get("vsa_absorption"):
-                    score += 20  # VSA is still valuable
+                    score += 15
                 if tech_res.get("squeeze"):
-                    score += 10  # Consolidation is good
+                    score += 10
                 if tech_res.get("vcp"):
                     score += 5
                 
-                # C. Volume (But not explosive)
+                # E. Volume (Progressive, not explosive)
                 if 1.2 <= tech_res["rvol"] <= 2.5:
-                    score += 15  # Progressive accumulation range
+                    score += 10
                 elif tech_res["rvol"] > 2.5:
-                    score -= 10  # Penalize explosive volume (too late)
+                    score -= 15  # Penalize explosive volume
                 
-                # D. Trend (Slightly positive, but not required)
-                if tech_res["trend"] == "Uptrend":
-                    score += 5
-                
-                # E. Fundamentals
+                # F. Fundamentals
                 if fund_res["passed"]: 
                     score += 10
 
                 if score > 0:
+                    # Add money flow and zone info to result
+                    tech_res['money_flow_signals'] = mf_signals['signal_count']
+                    tech_res['current_zone'] = current_zone
+                    tech_res['price_position'] = round(price_position, 2)
+                    
                     result = {
                         "symbol": symbol,
                         "passed_financials": fund_res["passed"],
