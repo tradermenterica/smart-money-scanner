@@ -16,7 +16,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()  # This loads all API keys automatically
 
-app = FastAPI(title="Smart Money Scanner API", version="3.1.0", debug=True)
+app = FastAPI(title="Smart Money Scanner API", version="3.2.0", debug=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,7 +59,7 @@ worker_status = {
 @app.on_event("startup")
 async def startup_event():
     print("\n" + "="*40)
-    print("SMART MONEY API v2.9.2 (LuxAlgo Engine)")
+    print("SMART MONEY API v3.2.0 (LuxAlgo Engine)")
     print("Servidor operativo e instantáneo.")
     print("="*40)
     # NO bloqueamos el inicio. El trabajador se lanzará después de que el servidor esté arriba.
@@ -77,18 +77,9 @@ async def run_background_worker(force_clean: bool = False):
     
     worker_status["is_running"] = True
     try:
-        # Lógica inteligente de limpieza
-        if force_clean:
-            print("[SISTEMA] Limpieza forzada solicitada por el usuario.")
-            scanner.db.clear_all()
-        else:
-            is_prod = os.getenv("RENDER") is not None
-            count = scanner.db.count_stocks()
-            if is_prod and count > 0:
-                print(f"[SISTEMA] Modo Producción: Manteniendo {count} activos precargados para rapidez.")
-            else:
-                print("\n[SISTEMA] Iniciando limpieza y actualización total...")
-                scanner.db.clear_all()
+        # Siempre limpiar al iniciar para asegurar frescura total
+        print("\n[SISTEMA] Iniciando limpieza y actualización total para nuevos filtros...")
+        scanner.db.clear_all()
         
         # Descarga de la lista de tickers
         if DARWINEX_ONLY:
@@ -118,7 +109,7 @@ def get_status():
     count = scanner.db.count_stocks()
     return {
         "metodo": "GET",
-        "version": "2.9.2 (LuxAlgo Optimized)", 
+        "version": "3.2.0 (LuxAlgo Optimized)", 
         "estado_base_datos": f"{count} activos indexados",
         "trabajador": worker_status,
         "puntos_de_entrada": ["/api/scan", "/api/analyze/{symbol}", "/api/update-db"]
