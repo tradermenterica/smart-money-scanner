@@ -11,6 +11,7 @@ class TechnicalAnalyzer:
             return
 
         # Simple Moving Averages
+        self.df['SMA_10'] = self.df['Close'].rolling(window=10).mean()
         self.df['SMA_50'] = self.df['Close'].rolling(window=50).mean()
         self.df['SMA_200'] = self.df['Close'].rolling(window=200).mean()
         
@@ -36,6 +37,104 @@ class TechnicalAnalyzer:
         # 1. Spread (High - Low)
         self.df['SPREAD'] = self.df['High'] - self.df['Low']
         self.df['SPREAD_SMA_20'] = self.df['SPREAD'].rolling(window=20).mean()
+        
+        # 2. OBV (On-Balance Volume) - Critical for early accumulation
+        self.df['OBV'] = 0.0
+        obv = 0
+        for i in range(len(self.df)):
+            if i == 0:
+                obv = self.df['Volume'].iloc[i]
+            else:
+                if self.df['Close'].iloc[i] > self.df['Close'].iloc[i-1]:
+                    obv += self.df['Volume'].iloc[i]
+                elif self.df['Close'].iloc[i] < self.df['Close'].iloc[i-1]:
+                    obv -= self.df['Volume'].iloc[i]
+            self.df.loc[self.df.index[i], 'OBV'] = obv
+
+
+    def detect_early_accumulation(self) -> bool:
+        """
+        Detects 'Silent Accumulation' phase BEFORE breakout (BAX Image 2 setup).
+        
+        Criteria:
+        1. Price consolidating (not trending up strongly)
+        2. Volume progressively increasing (RVOL 1.2-2.5)
+        3. OBV divergence (OBV rising while price flat/down)
+        4. Price near support (SMA50), NOT at resistance
+        """
+        if self.df.empty or len(self.df) < 50:
+            return False
+            
+        last = self.df.iloc[-1]
+        
+        # 1. CONSOLIDATION CHECK: Price NOT moving up strongly
+        recent_5d = self.df.tail(5)
+        price_change_5d = ((recent_5d['Close'].iloc[-1] - recent_5d['Close'].iloc[0]) / recent_5d['Close'].iloc[0]) * 100
+        
+        # If price moved >3% in last 5 days, it's already breaking out
+        if price_change_5d > 3.0:
+            return False
+        
+        # ATR check: Volatility should be low (consolidating)
+        atr_20 = self.df['SPREAD'].rolling(20).mean().iloc[-1]
+        atr_recent = self.df['SPREAD'].tail(20)
+        if atr_20 > atr_recent.quantile(0.6):  # If ATR high, it's moving too much
+            return False
+        
+        # 2. PROGRESSIVE VOLUME ACCUMULATION
+        if pd.isnull(last['RVOL']) or last['RVOL'] < 1.2:
+            return False  # Volume too low
+        if last['RVOL'] > 2.5:
+            return False  # Volume already explosive (too late)
+        
+        # Volume trending up? Last 3 days avg > prior 3 days avg
+        vol_last_3 = self.df['Volume'].tail(6).iloc[-3:].mean()
+        vol_prior_3 = self.df['Volume'].tail(6).iloc[:3].mean()
+        progressive_volume = vol_last_3 > vol_prior_3
+        
+        if not progressive_volume:
+            return False
+        
+        # No single-day volume spike > 3x (that would be explosion, not accumulation)
+        recent_vols = self.df['RVOL'].tail(5)
+        if (recent_vols > 3.0).any():
+            return False
+        
+        # 3. OBV DIVERGENCE: Money flowing in while price flat/down
+        if 'OBV' not in self.df.columns:
+            return False
+            
+        obv_10d = self.df['OBV'].tail(10)
+        price_10d = self.df['Close'].tail(10)
+        
+        # Calculate slopes using numpy polyfit
+        x = np.arange(len(obv_10d))
+        obv_slope = np.polyfit(x, obv_10d.values, 1)[0]
+        price_slope = np.polyfit(x, price_10d.values, 1)[0]
+        
+        # OBV should be rising while price is flat or falling
+        if obv_slope <= 0:
+            return False  # OBV not rising
+        if price_slope > obv_slope * 0.5:
+            return False  # Price rising too much (not diverging)
+        
+        # 4. SUPPORT PROXIMITY: Near SMA50, NOT at resistance
+        if pd.isnull(last['SMA_50']):
+            return False
+        
+        # Price should be within 15% of SMA50 (can be above during accumulation)
+        distance_from_sma50 = ((last['Close'] - last['SMA_50']) / last['SMA_50']) * 100
+        if distance_from_sma50 > 15.0:
+            return False  # Too far above SMA50
+        
+        # NOT at recent high (resistance check)
+        recent_20d_high = self.df['High'].tail(20).max()
+        distance_from_high = ((recent_20d_high - last['Close']) / last['Close']) * 100
+        if distance_from_high < 3.0:
+            return False  # Too close to resistance
+        
+        # All checks passed - this is early accumulation!
+        return True
 
     def check_setup(self) -> dict:
         """
@@ -82,6 +181,9 @@ class TechnicalAnalyzer:
             is_high_volume = last['RVOL'] > 1.6
             is_narrow_spread = last['SPREAD'] < (last['SPREAD_SMA_20'] * 0.9)
             vsa_absorption = is_high_volume and is_narrow_spread
+        
+        # 6. EARLY ACCUMULATION (BAX Image 2 Setup)
+        early_accumulation = self.detect_early_accumulation()
 
         return {
             "trend": "Uptrend" if bullish_trend else "Downtrend",
@@ -89,7 +191,9 @@ class TechnicalAnalyzer:
             "vcp": bool(vcp),
             "breakout": bool(breakout),
             "vsa_absorption": bool(vsa_absorption),
+            "early_accumulation": bool(early_accumulation),
             "bandwidth": float(bandwidth),
             "rvol": float(last['RVOL']) if pd.notnull(last['RVOL']) else 0.0,
-            "last_close": float(last['Close'])
+            "last_close": float(last['Close']),
+            "sma_10": float(last.get('SMA_10', 0)) if pd.notnull(last.get('SMA_10')) else 0.0
         }

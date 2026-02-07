@@ -106,34 +106,61 @@ class Scanner:
                 inst.analyze_flows()
                 inst_res = inst.detect_smart_money()
 
-                # NEW Scoring Logic: "Short-Term Explosive"
+                # ========================================
+                # NEW SCORING LOGIC: "EARLY ACCUMULATION ONLY"
+                # Goal: Detect BAX Image 2 (BEFORE explosion), reject AMGN Image 1 (AFTER explosion)
+                # ========================================
+                
+                # STRICT FILTER: Reject if already in breakout
+                # If price moved >3% above SMA10 in last 1 day, it's too late
+                sma_10 = tech_res.get("sma_10", 0)
+                if sma_10 > 0 and tech_res["last_close"] > (sma_10 * 1.03):
+                    continue  # Skip - already breaking out
+                
+                # STRICT FILTER: Reject if already had breakout signal
+                if tech_res.get("breakout"):
+                    continue  # Skip - already exploded
+                
                 score = 0
                 
-                # A. Technical Core (High Priority)
-                if tech_res["trend"] == "Uptrend": score += 15
-                if tech_res["squeeze"]: score += 30  # Squeeze is critical for explosion
-                if tech_res["vcp"]: score += 15      # Contraction is a bonus
-                if tech_res["breakout"]: score += 20  # If already breaking, it's good
+                # === CORE SIGNAL: Early Accumulation (Image 2 Setup) ===
+                if tech_res.get("early_accumulation"):
+                    score += 60  # MASSIVE bonus - this is THE signal we want
+                else:
+                    # If no early accumulation, only proceed if other strong signals exist
+                    # This ensures we don't get garbage results
+                    if not (tech_res.get("vsa_absorption") or (tech_res.get("squeeze") and inst_res["detected"])):
+                        continue  # Skip - no high-conviction setup
                 
-                # B. Money Flow & Volume
-                if tech_res["rvol"] > 2.0: 
-                    score += 20
-                elif tech_res["rvol"] > 1.2:
-                    score += 10
-                    
-                if inst_res["detected"]: score += 20
-                if inst_res["institutional_score"] >= 6: score += 15 # LuxAlgo High Conviction multiplier
+                # === Supporting Signals ===
                 
-                # C. Fundamentals (Reduced priority for short-term)
-                if fund_res["passed"]: score += 10
-                
-                # Bonus: RVOL during Squeeze/VCP combined with Institutional buying is "The Perfect Trade"
-                if (tech_res["squeeze"] or tech_res["vcp"]) and inst_res["detected"]:
-                    score += 20
-                
-                # NEW Bonus: VSA Absorption "Effort vs Result" (PH Setup)
-                if tech_res.get("vsa_absorption"):
+                # A. Institutional Activity
+                if inst_res["detected"]: 
                     score += 25
+                if inst_res["institutional_score"] >= 6: 
+                    score += 10  # LuxAlgo high conviction
+                
+                # B. Technical Setups (Lower priority than early accumulation)
+                if tech_res.get("vsa_absorption"):
+                    score += 20  # VSA is still valuable
+                if tech_res.get("squeeze"):
+                    score += 10  # Consolidation is good
+                if tech_res.get("vcp"):
+                    score += 5
+                
+                # C. Volume (But not explosive)
+                if 1.2 <= tech_res["rvol"] <= 2.5:
+                    score += 15  # Progressive accumulation range
+                elif tech_res["rvol"] > 2.5:
+                    score -= 10  # Penalize explosive volume (too late)
+                
+                # D. Trend (Slightly positive, but not required)
+                if tech_res["trend"] == "Uptrend":
+                    score += 5
+                
+                # E. Fundamentals
+                if fund_res["passed"]: 
+                    score += 10
 
                 if score > 0:
                     result = {
