@@ -145,3 +145,60 @@ class MoneyFlowDetector:
             'signal_strength': float(avg_cmf),
             'has_recent_flow': signal_count >= 2
         }
+    
+    def detect_pullback_accumulation(self, lookback: int = 10) -> dict:
+        """
+        CRITICAL METHOD: Detects money flow signals that occur DURING price pullback.
+        This is the key to detecting CNC/APOV setups and rejecting XOM/CAT/COST.
+        
+        The difference:
+        - CNC/APOV: MFI signals while price is consolidating/falling (accumulation)
+        - XOM/CAT: MFI signals while price is rallying (momentum trading)
+        
+        Args:
+            lookback: Days to analyze for price trend (default 10)
+            
+        Returns:
+            dict with:
+            - has_pullback_accumulation: True if money flowing in during pullback
+            - signal_count: Number of money flow signals
+            - price_action: 'pullback', 'consolidating', or 'rallying'
+            - price_change_pct: Recent price change percentage
+        """
+        if self.df.empty or len(self.df) < 20:
+            return {
+                'has_pullback_accumulation': False,
+                'signal_count': 0,
+                'price_action': 'unknown',
+                'price_change_pct': 0.0
+            }
+        
+        # Get money flow signals
+        signals = self.detect_signals(lookback=5)
+        
+        # Analyze recent price action
+        recent_prices = self.df['Close'].tail(lookback)
+        price_start = float(recent_prices.iloc[0])
+        price_end = float(recent_prices.iloc[-1])
+        price_change_pct = ((price_end - price_start) / price_start) * 100
+        
+        # Classify price action
+        if price_change_pct > 5:
+            price_action = 'rallying'
+        elif price_change_pct < -5:
+            price_action = 'pullback'
+        else:
+            price_action = 'consolidating'
+        
+        # CRITICAL LOGIC: Only accept signals if NOT rallying
+        # This filters out XOM/CAT/COST (rally-based signals)
+        # And keeps CNC/APOV (pullback accumulation)
+        has_accumulation = (signals['signal_count'] >= 2 and 
+                           price_change_pct < 5)  # Not rallying
+        
+        return {
+            'has_pullback_accumulation': has_accumulation,
+            'signal_count': signals['signal_count'],
+            'price_action': price_action,
+            'price_change_pct': round(price_change_pct, 2)
+        }
