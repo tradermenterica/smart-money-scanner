@@ -129,24 +129,43 @@ class Scanner:
     def evaluate_setup(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> list:
         """
         Runs all available setup evaluators and returns a list of matching results.
+        Optimized to calculate indicators once.
         """
         results = []
         
+        # Calculate technical indicators ONCE
+        tech = TechnicalAnalyzer(df)
+        tech.calculate_indicators()
+        tech_res = tech.check_setup()
+        
         # Scenario A: Smart Money Dip Buy (EXC Style)
-        dip_res = self.evaluate_dip_buy(symbol, df, fund_res, inst_res)
+        dip_res = self.evaluate_dip_buy(symbol, df, fund_res, inst_res, tech_res)
         if dip_res: results.append(dip_res)
         
         # Scenario B: Early Accumulation (BAX Style)
-        acc_res = self.evaluate_early_accumulation(symbol, df, fund_res, inst_res)
+        acc_res = self.evaluate_early_accumulation(symbol, df, fund_res, inst_res, tech, tech_res)
         if acc_res: results.append(acc_res)
         
         # Scenario C: High Volume Breakout
-        breakout_res = self.evaluate_breakout(symbol, df, fund_res, inst_res)
+        breakout_res = self.evaluate_breakout(symbol, df, fund_res, inst_res, tech_res)
         if breakout_res: results.append(breakout_res)
         
+        # PROGRESS TRACKING: If no scenario matched, save as "Neutral" to show progress in DB
+        if not results:
+            self.db.save_result({
+                "symbol": symbol,
+                "passed_financials": fund_res["passed"] if fund_res else False,
+                "score": 0,
+                "details": {
+                    "setup_type": "Neutral / No Match",
+                    "technicals": tech_res,
+                    "fundamentals": fund_res
+                }
+            })
+            
         return results
 
-    def evaluate_dip_buy(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> dict:
+    def evaluate_dip_buy(self, symbol: str, df: pd.DataFrame, fund_res: dict, inst_res: dict, tech_res: dict) -> dict:
         """Scenario A: Detects Smart Money Dips (EXC Style)"""
         try:
             if df.empty or len(df) < 50: return None
@@ -163,7 +182,7 @@ class Scanner:
             if not (min_dd < drawdown_pct < max_dd):
                 return None
             
-            # Money Flow during pullback
+            # Money Flow during pullback (Must calculate MF specifically as it's more narrow)
             from core.money_flow import MoneyFlowDetector
             mf_detector = MoneyFlowDetector(df)
             pullback_acc = mf_detector.detect_pullback_accumulation(lookback=10)
@@ -183,11 +202,9 @@ class Scanner:
             if inst_res and inst_res["detected"]: score += 10
             if fund_res and fund_res["passed"]: score += 5
 
-            # Base technicals
-            tech = TechnicalAnalyzer(df)
-            tech.calculate_indicators()
-            tech_res = tech.check_setup()
-            tech_res.update({
+            # Update tech_res copy with specific dip data
+            dip_tech = tech_res.copy()
+            dip_tech.update({
                 'pullback_pct': round(drawdown_pct, 2),
                 'range_position_60d': round(position_60d, 2),
                 'setup_type': 'Smart Money Dip Buy'
@@ -201,17 +218,15 @@ class Scanner:
                     "setup_type": "Smart Money Dip Buy",
                     "description": "Caída técnica con acumulación institucional en zona de soporte.",
                     "fundamentals": fund_res,
-                    "technicals": tech_res,
+                    "technicals": dip_tech,
                     "institutional": inst_res
                 }
             }
         except: return None
 
-    def evaluate_early_accumulation(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> dict:
+    def evaluate_early_accumulation(self, symbol: str, df: pd.DataFrame, fund_res: dict, inst_res: dict, tech: TechnicalAnalyzer, tech_res: dict) -> dict:
         """Scenario B: Detects Silent/Early Accumulation (BAX Style)"""
         try:
-            tech = TechnicalAnalyzer(df)
-            tech.calculate_indicators()
             if not tech.detect_early_accumulation():
                 return None
             
@@ -219,8 +234,8 @@ class Scanner:
             if inst_res and inst_res["detected"]: score += 15
             if fund_res and fund_res["passed"]: score += 10
             
-            tech_res = tech.check_setup()
-            tech_res['setup_type'] = 'Early Accumulation'
+            acc_tech = tech_res.copy()
+            acc_tech['setup_type'] = 'Early Accumulation'
 
             return {
                 "symbol": symbol,
@@ -230,19 +245,15 @@ class Scanner:
                     "setup_type": "Early Accumulation",
                     "description": "Acumulación silenciosa: volumen progresivo con precio lateral cerca de soporte.",
                     "fundamentals": fund_res,
-                    "technicals": tech_res,
+                    "technicals": acc_tech,
                     "institutional": inst_res
                 }
             }
         except: return None
 
-    def evaluate_breakout(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> dict:
+    def evaluate_breakout(self, symbol: str, df: pd.DataFrame, fund_res: dict, inst_res: dict, tech_res: dict) -> dict:
         """Scenario C: Detects High Volume Breakouts"""
         try:
-            tech = TechnicalAnalyzer(df)
-            tech.calculate_indicators()
-            tech_res = tech.check_setup()
-            
             if not tech_res.get('breakout') or tech_res.get('rvol', 0) < 1.8:
                 return None
             
@@ -250,6 +261,9 @@ class Scanner:
             if tech_res.get('rvol') > 2.5: score += 10
             if inst_res and inst_res["detected"]: score += 10
             
+            breakout_tech = tech_res.copy()
+            breakout_tech['setup_type'] = 'High Volume Breakout'
+
             return {
                 "symbol": symbol,
                 "passed_financials": fund_res["passed"] if fund_res else False,
@@ -258,7 +272,7 @@ class Scanner:
                     "setup_type": "High Volume Breakout",
                     "description": "Rompimiento de resistencia con volumen institucional explosivo.",
                     "fundamentals": fund_res,
-                    "technicals": tech_res,
+                    "technicals": breakout_tech,
                     "institutional": inst_res
                 }
             }
