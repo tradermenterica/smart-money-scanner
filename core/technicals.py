@@ -124,12 +124,19 @@ class TechnicalAnalyzer:
         if distance_from_sma50 > 20.0: # Increased from 15%
             return False
         
-        # RELAXED RESISTANCE: Allow closer proximity (1.5% instead of 3%)
-        recent_20d_high = self.df['High'].tail(20).max()
-        distance_from_high = ((recent_20d_high - last['Close']) / last['Close']) * 100
-        if distance_from_high < 1.0:
-            return False
+        # 5. RANGE POSITION: Must be in the bottom 50% of last 100 days
+        # This prevents picking tops (like ADI) and focuses on the base (like GS).
+        high_100d = self.df['High'].tail(100).max()
+        low_100d = self.df['Low'].tail(100).min()
+        total_range = high_100d - low_100d
         
+        position_in_range_100d = 0.0
+        if total_range > 0:
+            position_in_range_100d = ((last['Close'] - low_100d) / total_range) * 100
+            
+        if position_in_range_100d > 50.0:  # Must be in lower half
+            return False
+
         # All checks passed - this is early accumulation!
         return True
 
