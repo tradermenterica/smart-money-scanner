@@ -182,10 +182,10 @@ class Scanner:
             if not (min_dd < drawdown_pct < max_dd):
                 return None
             
-            # Money Flow during pullback (Must calculate MF specifically as it's more narrow)
+            # Money Flow during pullback (Sincronizado con lookback de caída)
             from core.money_flow import MoneyFlowDetector
             mf_detector = MoneyFlowDetector(df)
-            pullback_acc = mf_detector.detect_pullback_accumulation(lookback=10)
+            pullback_acc = mf_detector.detect_pullback_accumulation(lookback=lookback)
             if not pullback_acc['has_pullback_accumulation']:
                 return None
             
