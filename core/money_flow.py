@@ -190,10 +190,9 @@ class MoneyFlowDetector:
         else:
             price_action = 'consolidating'
         
-        # CRITICAL LOGIC: Only accept signals if NOT rallying
-        # This filters out XOM/CAT/COST (rally-based signals)
-        # And keeps CNC/APOV (pullback accumulation)
-        has_accumulation = (signals['signal_count'] >= 2 and 
+        # RELAXED LOGIC: Accept even 1 strong signal if NOT rallying
+        # (Changed from >= 2 to >= 1 to capture EXC-style early setups)
+        has_accumulation = (signals['signal_count'] >= 1 and 
                            price_change_pct < 5)  # Not rallying
         
         return {
