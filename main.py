@@ -174,6 +174,8 @@ def get_dip_opportunities(limit: int = 10):
     # BATCH DATA FETCH (Much Faster)
     batch_data = DataFetcher.get_batch_history(symbols, period="6mo")
     
+    dip_opportunities = []
+
     # Analyze candidates
     for symbol in symbols:
         try:
@@ -181,43 +183,34 @@ def get_dip_opportunities(limit: int = 10):
             
             # Robust extraction of single ticker from batch
             if isinstance(batch_data.columns, pd.MultiIndex):
-                # Structure: (Ticker, OHLCV) OR (OHLCV, Ticker)
                 try:
-                    # Try accessing top level (Ticker) 
                     ticker_df = batch_data[symbol]
                 except KeyError:
-                    # Maybe Ticker is at level 1?
                     try:
                         ticker_df = batch_data.xs(symbol, axis=1, level=1)
                     except:
                         continue
             else:
-                # Flat DataFrame (usually implies single ticker result)
-                # Check if this flat DF belongs to the requested symbol
-                # When yfinance downloads 1 ticker, it returns flat DF
                 if len(symbols) == 1 and symbol == symbols[0]:
                     ticker_df = batch_data
                 else:
-                    # We have a flat DF but looping through multiple symbols?
-                    # This implies only one symbol succeeded or bad structure
                     continue
 
             if ticker_df.empty: 
                 continue
             
-            # Ensure index is datetime (sometimes lost)
             if not isinstance(ticker_df.index, pd.DatetimeIndex):
                 ticker_df.index = pd.to_datetime(ticker_df.index)
 
-            # Use the new centralized evaluation logic (The 3 Strict Filters)
-            dip_result = scanner.evaluate_setup(symbol, df=ticker_df)
+            # Use the new centralized evaluation logic (Returns a LIST of setups)
+            setups_found = scanner.evaluate_setup(symbol, df=ticker_df)
             
-            if dip_result:
-                # Add dip_score for backward compatibility with frontend if needed
-                dip_result['dip_score'] = dip_result['score']
-                dip_opportunities.append(dip_result)
+            for res in setups_found:
+                # We specifically want the "Dip" setup in this endpoint
+                if res['details'].get('setup_type') == "Smart Money Dip Buy":
+                    res['dip_score'] = res['score']
+                    dip_opportunities.append(res)
         except Exception as e:
-            # print(f"Error processing {symbol}: {e}")
             continue
     
     # Sort by score
