@@ -173,8 +173,8 @@ class MoneyFlowDetector:
                 'price_change_pct': 0.0
             }
         
-        # Get money flow signals
-        signals = self.detect_signals(lookback=5)
+        # Get money flow signals (Sincronizado con la caída)
+        signals = self.detect_signals(lookback=lookback)
         
         # Analyze recent price action
         recent_prices = self.df['Close'].tail(lookback)
