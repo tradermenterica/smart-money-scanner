@@ -17,7 +17,7 @@ import pandas as pd
 from dotenv import load_dotenv
 load_dotenv()  # This loads all API keys automatically
 
-app = FastAPI(title="Smart Money Scanner API", version="3.2.0", debug=True)
+app = FastAPI(title="Smart Money Scanner API", version="3.2.1", debug=True)
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,7 +60,7 @@ worker_status = {
 @app.on_event("startup")
 async def startup_event():
     print("\n" + "="*40)
-    print("SMART MONEY API v3.2.0 (LuxAlgo Engine)")
+    print("SMART MONEY API v3.2.1 (LuxAlgo Engine)")
     print("Servidor operativo e instantáneo.")
     print("="*40)
     # NO bloqueamos el inicio. El trabajador se lanzará después de que el servidor esté arriba.
@@ -118,7 +118,7 @@ def get_status():
     count = scanner.db.count_stocks()
     return {
         "metodo": "GET",
-        "version": "3.2.0 (LuxAlgo Optimized)", 
+        "version": "3.2.1 (LuxAlgo Optimized)", 
         "estado_base_datos": f"{count} activos indexados",
         "trabajador": worker_status,
         "puntos_de_entrada": ["/api/scan", "/api/analyze/{symbol}", "/api/update-db"]
