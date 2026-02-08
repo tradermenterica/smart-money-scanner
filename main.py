@@ -168,8 +168,10 @@ def get_dip_opportunities(limit: int = 10):
     candidates = scanner.get_results_from_db(min_score=0, limit=20)
     symbols = [c['symbol'] for c in candidates]
     
+    # SEED TICKERS: If DB is totally empty (cold start), use known examples to show it works
     if not symbols:
-        return {"conteo": 0, "resultados": []}
+        print("[DIP] DB totally empty. Using seed tickers (EXC, BAX, etc.) for initial scan.")
+        symbols = ["EXC", "BAX", "CNC", "APOV", "AVAV", "XOM", "CAT"]
 
     # BATCH DATA FETCH (Much Faster)
     batch_data = DataFetcher.get_batch_history(symbols, period="6mo")
