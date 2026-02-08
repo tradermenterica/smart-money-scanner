@@ -14,10 +14,18 @@ class DatabaseManager:
         return sqlite3.connect(DB_NAME, check_same_thread=False)
 
     def init_db(self):
-        """Creates the necessary tables if they don't exist."""
+        """Creates the necessary tables if they don't exist and handles migrations."""
         conn = self.get_connection()
         cursor = conn.cursor()
         
+        # Check if table exists and has the new column
+        try:
+            cursor.execute('SELECT setup_type FROM stocks LIMIT 1')
+        except sqlite3.OperationalError:
+            # Table doesn't exist or column is missing
+            print("[DB] Outdated schema or table missing. Recreating 'stocks' table...")
+            cursor.execute('DROP TABLE IF EXISTS stocks')
+            
         # Table for storing scan results
         # Composite primary key allows a stock to have multiple setup classifications
         cursor.execute('''

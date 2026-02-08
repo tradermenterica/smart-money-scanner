@@ -11,6 +11,7 @@ from pydantic import BaseModel
 import asyncio
 import time
 import os
+import pandas as pd
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
