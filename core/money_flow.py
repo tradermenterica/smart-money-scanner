@@ -190,9 +190,9 @@ class MoneyFlowDetector:
         else:
             price_action = 'consolidating'
         
-        # RELAXED LOGIC: Accept even 1 strong signal if NOT rallying
-        # (Changed from >= 2 to >= 1 to capture EXC-style early setups)
-        has_accumulation = (signals['signal_count'] >= 1 and 
+        # STRICT LOGIC: Only accept signals if NOT rallying
+        # (Reverted to >= 2 to maintain high-conviction standards)
+        has_accumulation = (signals['signal_count'] >= 2 and 
                            price_change_pct < 5)  # Not rallying
         
         return {

@@ -172,8 +172,8 @@ class Scanner:
 
             # Pullback logic
             lookback = DIP_THRESHOLDS.get("LOOKBACK_DAYS", 60)
-            min_dd = DIP_THRESHOLDS.get("MIN_DRAWDOWN", -25)
-            max_dd = DIP_THRESHOLDS.get("MAX_DRAWDOWN", -3)
+            min_dd = DIP_THRESHOLDS.get("MIN_DRAWDOWN", -45)
+            max_dd = DIP_THRESHOLDS.get("MAX_DRAWDOWN", -10)
             
             high_60d = float(df['High'].tail(lookback).max())
             current_price = float(df['Close'].iloc[-1])
