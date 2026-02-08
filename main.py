@@ -156,20 +156,21 @@ def get_dip_opportunities(limit: int = 10):
     if not DIP_DETECTION_ENABLED:
         return {"error": "Dip detection is disabled. Enable in config.py"}
     
-    # Get ALL candidates from DB (don't filter by score because dips might have low momentum scores)
-    # We fetch a larger pool to find those hidden gems that fell
-    # REDUCED LIMIT: 100 to prevent timeout (fetching 300 sync takes too long)
-    candidates = scanner.get_results_from_db(min_score=0, limit=100)
+    # Get ONLY candidates with "Smart Money Dip Buy" tag from DB
+    db_results = scanner.db.get_top_stocks(min_score=0, limit=limit, setup_type="Smart Money Dip Buy")
     
-    dip_opportunities = []
-    
-    # Analyze candidates
-    # The dip_detector now has a "Fail Fast" mechanism so it's safe to loop through many
+    if db_results:
+        return {"conteo": len(db_results), "resultados": db_results}
+
+    # FALLBACK: If DB is empty, perform a "Live Scan" on top 20 candidates
+    print("[DIP] DB empty for dips, running live scan on top candidates...")
+    candidates = scanner.get_results_from_db(min_score=0, limit=20)
     symbols = [c['symbol'] for c in candidates]
     
+    if not symbols:
+        return {"conteo": 0, "resultados": []}
+
     # BATCH DATA FETCH (Much Faster)
-    # Fetch all data in one go instead of 100 sequential requests
-    print(f"[DIP] Fetching batch data for {len(symbols)} tickers...")
     batch_data = DataFetcher.get_batch_history(symbols, period="6mo")
     
     # Analyze candidates
@@ -207,16 +208,19 @@ def get_dip_opportunities(limit: int = 10):
             if not isinstance(ticker_df.index, pd.DatetimeIndex):
                 ticker_df.index = pd.to_datetime(ticker_df.index)
 
-            dip_result = dip_detector.analyze_dip_opportunity(symbol, df=ticker_df)
+            # Use the new centralized evaluation logic (The 3 Strict Filters)
+            dip_result = scanner.evaluate_setup(symbol, df=ticker_df)
             
             if dip_result:
+                # Add dip_score for backward compatibility with frontend if needed
+                dip_result['dip_score'] = dip_result['score']
                 dip_opportunities.append(dip_result)
         except Exception as e:
             # print(f"Error processing {symbol}: {e}")
             continue
     
-    # Sort by dip score
-    dip_opportunities.sort(key=lambda x: x['dip_score'], reverse=True)
+    # Sort by score
+    dip_opportunities.sort(key=lambda x: x['score'], reverse=True)
     
     # Sanitize for JSON (Recursively replace NaN/Inf with None)
     # This prevents 500 errors when yfinance returns funky float values
@@ -238,6 +242,18 @@ def get_dip_opportunities(limit: int = 10):
         "conteo": len(final_result[:limit]),
         "resultados": final_result[:limit]
     }
+
+@app.get("/api/scan-accumulation")
+def get_accumulation_opportunities(limit: int = 10):
+    """Scenario B: Early Accumulation (Silent flows)"""
+    results = scanner.db.get_top_stocks(min_score=0, limit=limit, setup_type="Early Accumulation")
+    return {"conteo": len(results), "resultados": results}
+
+@app.get("/api/scan-breakouts")
+def get_breakout_opportunities(limit: int = 10):
+    """Scenario C: High Volume Breakouts"""
+    results = scanner.db.get_top_stocks(min_score=0, limit=limit, setup_type="High Volume Breakout")
+    return {"conteo": len(results), "resultados": results}
 
 @app.get("/api/institutional/{symbol}")
 def get_institutional_analysis(symbol: str):

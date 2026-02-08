@@ -113,102 +113,156 @@ class Scanner:
                 fund_analyzer = FundamentalAnalyzer(symbol)
                 fund_res = fund_analyzer.is_financially_solid()
                 
-                # 3. Institutional Analysis
+                # 2. Institutional Analysis
                 inst = InstitutionalDetector(df)
                 inst.analyze_flows()
                 inst_res = inst.detect_smart_money()
 
-                # ========================================
-                # COMPLETE REWRITE: SMART MONEY DIP BUY DETECTION
-                # Pattern: CNC, APOV (pullback + accumulation)
-                # Reject: XOM, CAT, COST (active rallies)
-                # ========================================
+                # Evaluate ALL setups (Dips, Accumulation, etc.)
+                evaluations = self.evaluate_setup(symbol, df, fund_res, inst_res)
                 
-                # ========================================
-                # STRICT FILTER 1: PULLBACK DETECTION
-                # Stock MUST be in configurable range from N-day high
-                # ========================================
-                lookback = DIP_THRESHOLDS.get("LOOKBACK_DAYS", 60)
-                min_dd = DIP_THRESHOLDS.get("MIN_DRAWDOWN", -45)
-                max_dd = DIP_THRESHOLDS.get("MAX_DRAWDOWN", -10)
-                
-                high_60d = float(df['High'].tail(lookback).max())
-                current_price = float(df['Close'].iloc[-1])
-                drawdown_pct = ((current_price - high_60d) / high_60d) * 100
-                
-                # REJECT if not in pullback range
-                if not (min_dd < drawdown_pct < max_dd):
-                    continue  # Skip - No significant pullback (XOM/CAT/COST rejected here)
-                
-                # ========================================
-                # STRICT FILTER 2: MONEY FLOW DURING PULLBACK
-                # Signals MUST appear while price is NOT rallying
-                # ========================================
-                mf_detector = MoneyFlowDetector(df)
-                pullback_acc = mf_detector.detect_pullback_accumulation(lookback=10)
-                
-                # REJECT if no accumulation during pullback
-                if not pullback_acc['has_pullback_accumulation']:
-                    continue  # Skip - No accumulation OR signals during rally
-                
-                # ========================================
-                # STRICT FILTER 3: SUPPORT ZONE POSITION
-                # Price MUST be in lower 40% of range
-                # ========================================
-                low_60d = float(df['Low'].tail(lookback).min())
-                range_60d = high_60d - low_60d
-                if range_60d > 0:
-                    position_60d = (current_price - low_60d) / range_60d
-                else:
-                    position_60d = 0.5
-                
-                # REJECT if too high in range
-                if position_60d > 0.40:
-                    continue  # Skip - Not in support zone
-                
-                # ========================================
-                # PASSED ALL 3 FILTERS - VALID SETUP
-                # ========================================
-                
-                # Simple scoring for valid setups
-                score = 70  # Base score for passing all filters
-                
-                # Bonus for setup strength
-                if pullback_acc['signal_count'] >= 3:
-                    score += 15  # Multiple signals
-                if abs(drawdown_pct) > 30:
-                    score += 10  # Deep pullback (more upside potential)
-                if position_60d < 0.25:
-                    score += 10  # Very low in range
-                
-                # Institutional confirmation
-                if inst_res["detected"]:
-                    score += 10
-                
-                # Fundamentals
-                if fund_res["passed"]:
-                    score += 5
-
-                # Prepare result with detailed info
-                tech_res['pullback_pct'] = round(drawdown_pct, 2)
-                tech_res['mf_signals'] = pullback_acc['signal_count']
-                tech_res['price_action'] = pullback_acc['price_action']
-                tech_res['range_position_60d'] = round(position_60d, 2)
-                
-                result = {
-                    "symbol": symbol,
-                    "passed_financials": fund_res["passed"],
-                    "score": min(score, 100),
-                    "details": {
-                        "fundamentals": fund_res,
-                        "technicals": tech_res,
-                        "institutional": inst_res,
-                        "setup_type": "Smart Money Dip Buy"
-                    }
-                }
-                self.db.save_result(result)
+                for eval_res in evaluations:
+                    self.db.save_result(eval_res)
             except Exception as e:
                 pass  # Silencioso para no ensuciar logs masivos
+
+    def evaluate_setup(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> list:
+        """
+        Runs all available setup evaluators and returns a list of matching results.
+        """
+        results = []
+        
+        # Scenario A: Smart Money Dip Buy (EXC Style)
+        dip_res = self.evaluate_dip_buy(symbol, df, fund_res, inst_res)
+        if dip_res: results.append(dip_res)
+        
+        # Scenario B: Early Accumulation (BAX Style)
+        acc_res = self.evaluate_early_accumulation(symbol, df, fund_res, inst_res)
+        if acc_res: results.append(acc_res)
+        
+        # Scenario C: High Volume Breakout
+        breakout_res = self.evaluate_breakout(symbol, df, fund_res, inst_res)
+        if breakout_res: results.append(breakout_res)
+        
+        return results
+
+    def evaluate_dip_buy(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> dict:
+        """Scenario A: Detects Smart Money Dips (EXC Style)"""
+        try:
+            if df.empty or len(df) < 50: return None
+
+            # Pullback logic
+            lookback = DIP_THRESHOLDS.get("LOOKBACK_DAYS", 60)
+            min_dd = DIP_THRESHOLDS.get("MIN_DRAWDOWN", -45)
+            max_dd = DIP_THRESHOLDS.get("MAX_DRAWDOWN", -10)
+            
+            high_60d = float(df['High'].tail(lookback).max())
+            current_price = float(df['Close'].iloc[-1])
+            drawdown_pct = ((current_price - high_60d) / high_60d) * 100
+            
+            if not (min_dd < drawdown_pct < max_dd):
+                return None
+            
+            # Money Flow during pullback
+            from core.money_flow import MoneyFlowDetector
+            mf_detector = MoneyFlowDetector(df)
+            pullback_acc = mf_detector.detect_pullback_accumulation(lookback=10)
+            if not pullback_acc['has_pullback_accumulation']:
+                return None
+            
+            # Support zone (40% bottom)
+            low_60d = float(df['Low'].tail(lookback).min())
+            range_60d = high_60d - low_60d
+            position_60d = (current_price - low_60d) / range_60d if range_60d > 0 else 0.5
+            if position_60d > 0.40:
+                return None
+
+            # Score & Result
+            score = 70
+            if pullback_acc['signal_count'] >= 3: score += 15
+            if inst_res and inst_res["detected"]: score += 10
+            if fund_res and fund_res["passed"]: score += 5
+
+            # Base technicals
+            tech = TechnicalAnalyzer(df)
+            tech.calculate_indicators()
+            tech_res = tech.check_setup()
+            tech_res.update({
+                'pullback_pct': round(drawdown_pct, 2),
+                'range_position_60d': round(position_60d, 2),
+                'setup_type': 'Smart Money Dip Buy'
+            })
+
+            return {
+                "symbol": symbol,
+                "passed_financials": fund_res["passed"] if fund_res else False,
+                "score": min(score, 100),
+                "details": {
+                    "setup_type": "Smart Money Dip Buy",
+                    "description": "Caída técnica con acumulación institucional en zona de soporte.",
+                    "fundamentals": fund_res,
+                    "technicals": tech_res,
+                    "institutional": inst_res
+                }
+            }
+        except: return None
+
+    def evaluate_early_accumulation(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> dict:
+        """Scenario B: Detects Silent/Early Accumulation (BAX Style)"""
+        try:
+            tech = TechnicalAnalyzer(df)
+            tech.calculate_indicators()
+            if not tech.detect_early_accumulation():
+                return None
+            
+            score = 75
+            if inst_res and inst_res["detected"]: score += 15
+            if fund_res and fund_res["passed"]: score += 10
+            
+            tech_res = tech.check_setup()
+            tech_res['setup_type'] = 'Early Accumulation'
+
+            return {
+                "symbol": symbol,
+                "passed_financials": fund_res["passed"] if fund_res else False,
+                "score": min(score, 100),
+                "details": {
+                    "setup_type": "Early Accumulation",
+                    "description": "Acumulación silenciosa: volumen progresivo con precio lateral cerca de soporte.",
+                    "fundamentals": fund_res,
+                    "technicals": tech_res,
+                    "institutional": inst_res
+                }
+            }
+        except: return None
+
+    def evaluate_breakout(self, symbol: str, df: pd.DataFrame, fund_res: dict = None, inst_res: dict = None) -> dict:
+        """Scenario C: Detects High Volume Breakouts"""
+        try:
+            tech = TechnicalAnalyzer(df)
+            tech.calculate_indicators()
+            tech_res = tech.check_setup()
+            
+            if not tech_res.get('breakout') or tech_res.get('rvol', 0) < 1.8:
+                return None
+            
+            score = 80
+            if tech_res.get('rvol') > 2.5: score += 10
+            if inst_res and inst_res["detected"]: score += 10
+            
+            return {
+                "symbol": symbol,
+                "passed_financials": fund_res["passed"] if fund_res else False,
+                "score": min(score, 100),
+                "details": {
+                    "setup_type": "High Volume Breakout",
+                    "description": "Rompimiento de resistencia con volumen institucional explosivo.",
+                    "fundamentals": fund_res,
+                    "technicals": tech_res,
+                    "institutional": inst_res
+                }
+            }
+        except: return None
 
     def run_full_scan_to_db(self, tickers: list):
         """

@@ -107,31 +107,28 @@ class TechnicalAnalyzer:
         obv_10d = self.df['OBV'].tail(10)
         price_10d = self.df['Close'].tail(10)
         
-        # Calculate slopes using numpy polyfit
+        # Calculate slopes
         x = np.arange(len(obv_10d))
         obv_slope = np.polyfit(x, obv_10d.values, 1)[0]
         price_slope = np.polyfit(x, price_10d.values, 1)[0]
         
-        # OBV should be rising while price is flat or falling
+        # RELAXED: OBV rising, price can rise slightly but less than OBV
         if obv_slope <= 0:
-            return False  # OBV not rising
-        if price_slope > obv_slope * 0.5:
-            return False  # Price rising too much (not diverging)
+            return False
         
-        # 4. SUPPORT PROXIMITY: Near SMA50, NOT at resistance
+        # 4. SUPPORT PROXIMITY
         if pd.isnull(last['SMA_50']):
             return False
         
-        # Price should be within 15% of SMA50 (can be above during accumulation)
         distance_from_sma50 = ((last['Close'] - last['SMA_50']) / last['SMA_50']) * 100
-        if distance_from_sma50 > 15.0:
-            return False  # Too far above SMA50
+        if distance_from_sma50 > 20.0: # Increased from 15%
+            return False
         
-        # NOT at recent high (resistance check)
+        # RELAXED RESISTANCE: Allow closer proximity (1.5% instead of 3%)
         recent_20d_high = self.df['High'].tail(20).max()
         distance_from_high = ((recent_20d_high - last['Close']) / last['Close']) * 100
-        if distance_from_high < 3.0:
-            return False  # Too close to resistance
+        if distance_from_high < 1.0:
+            return False
         
         # All checks passed - this is early accumulation!
         return True

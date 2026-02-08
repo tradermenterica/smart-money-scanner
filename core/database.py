@@ -19,15 +19,18 @@ class DatabaseManager:
         cursor = conn.cursor()
         
         # Table for storing scan results
+        # Composite primary key allows a stock to have multiple setup classifications
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS stocks (
-                symbol TEXT PRIMARY KEY,
+                symbol TEXT,
+                setup_type TEXT,
                 score INTEGER,
                 price REAL,
                 last_updated DATETIME,
                 details TEXT,
                 signals TEXT,
-                passed_financials BOOLEAN
+                passed_financials BOOLEAN,
+                PRIMARY KEY (symbol, setup_type)
             )
         ''')
         
@@ -44,10 +47,11 @@ class DatabaseManager:
         
         try:
             cursor.execute('''
-                INSERT OR REPLACE INTO stocks (symbol, score, price, last_updated, details, signals, passed_financials)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT OR REPLACE INTO stocks (symbol, setup_type, score, price, last_updated, details, signals, passed_financials)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 result['symbol'],
+                result['details'].get('setup_type', 'Generic'),
                 result['score'],
                 result.get('details', {}).get('technicals', {}).get('last_close', 0),
                 datetime.now(),
@@ -61,18 +65,26 @@ class DatabaseManager:
         finally:
             conn.close()
 
-    def get_top_stocks(self, limit=10, min_score=0):
-        """Retrieves top stocks from DB."""
+    def get_top_stocks(self, limit=10, min_score=0, setup_type=None):
+        """Retrieves top stocks from DB, optionally filtered by setup_type."""
         conn = self.get_connection()
         conn.row_factory = sqlite3.Row # Access columns by name
         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT * FROM stocks 
-            WHERE score >= ? 
-            ORDER BY score DESC 
-            LIMIT ?
-        ''', (min_score, limit))
+        if setup_type:
+            cursor.execute('''
+                SELECT * FROM stocks 
+                WHERE score >= ? AND setup_type = ?
+                ORDER BY score DESC 
+                LIMIT ?
+            ''', (min_score, setup_type, limit))
+        else:
+            cursor.execute('''
+                SELECT * FROM stocks 
+                WHERE score >= ? 
+                ORDER BY score DESC 
+                LIMIT ?
+            ''', (min_score, limit))
         
         rows = cursor.fetchall()
         
@@ -80,6 +92,7 @@ class DatabaseManager:
         for row in rows:
             results.append({
                 "symbol": row['symbol'],
+                "setup_type": row['setup_type'],
                 "score": row['score'],
                 "price": row['price'],
                 "passed_financials": bool(row['passed_financials']),
